@@ -1,0 +1,130 @@
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+
+// Design System
+import AuthLayout from '../../components/AuthLayout';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../constants/theme';
+
+// Logic
+import { doctorService } from '../../services/doctorService';
+import { patientService } from '../../services/patientService';
+
+export default function DoctorReviewDetail() {
+  const router = useRouter();
+  const { caseId } = useLocalSearchParams();
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [caseData, setCaseData] = useState<any>(null);
+  const [analysis, setAnalysis] = useState('');
+
+  useEffect(() => {
+    const fetchDetails = async () => {
+      try {
+        const id = Array.isArray(caseId) ? caseId[0] : caseId;
+        const res = await patientService.getCaseStatus(id); // Reusing status fetch for details
+        if (res.success) setCaseData(res.data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDetails();
+  }, [caseId]);
+
+  const handleSubmit = async () => {
+    if (!analysis.trim()) return Alert.alert("Required", "Please provide a clinical analysis.");
+    
+    setSubmitting(true);
+    const res = await doctorService.submitAnalysis(caseData._id, { 
+      summary: analysis, 
+      diagnosis: "Confirmed via Portal" 
+    });
+
+    if (res.success) {
+      Alert.alert("Success", "Review submitted. Case is now completed.");
+      router.replace('../(tabs)/doctorhome');
+    } else {
+      Alert.alert("Error", "Failed to submit. Try again.");
+    }
+    setSubmitting(false);
+  };
+
+  if (loading) return (
+    <AuthLayout><ActivityIndicator style={{marginTop: 100}} color={COLORS.secondary} /></AuthLayout>
+  );
+
+  return (
+    <AuthLayout>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+             <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Review Case</Text>
+        </View>
+
+        <View style={styles.glassCard}>
+          <Text style={styles.label}>Patient Name</Text>
+          <Text style={styles.value}>{caseData?.patientId?.name || 'Test Patient'}</Text>
+          
+          <View style={styles.divider} />
+
+          <Text style={styles.label}>AI Preliminary Finding</Text>
+          <View style={styles.aiBox}>
+            <Text style={styles.aiText}>{caseData?.aiAnalysis?.result || "AI Analysis Pending..."}</Text>
+          </View>
+
+          <Text style={styles.label}>Clinical Analysis</Text>
+          <TextInput
+            style={styles.textArea}
+            placeholder="Type your professional observation here..."
+            multiline
+            numberOfLines={6}
+            value={analysis}
+            onChangeText={setAnalysis}
+          />
+
+          <PrimaryButton 
+            title={submitting ? "Submitting..." : "Complete Review"} 
+            onPress={handleSubmit}
+            disabled={submitting}
+          />
+        </View>
+      </ScrollView>
+    </AuthLayout>
+  );
+}
+
+const styles = StyleSheet.create({
+  scrollContent: { paddingBottom: 100 },
+  header: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 20 },
+  title: { ...TYPOGRAPHY.header, marginLeft: 15, color: COLORS.textMain },
+  glassCard: {
+    backgroundColor: COLORS.glassBg,
+    borderRadius: BORDER_RADIUS.card,
+    padding: 20,
+    marginHorizontal: 15,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+  },
+  label: { fontFamily: 'Inter-Medium', fontSize: 13, color: COLORS.textSub, marginBottom: 5 },
+  value: { fontFamily: 'Inter-Bold', fontSize: 18, color: COLORS.primary, marginBottom: 20 },
+  divider: { height: 1, backgroundColor: COLORS.border, marginBottom: 20 },
+  aiBox: { backgroundColor: 'rgba(20, 184, 166, 0.1)', padding: 15, borderRadius: 10, marginBottom: 25 },
+  aiText: { color: COLORS.secondary, fontFamily: 'Inter-SemiBold' },
+  textArea: {
+    backgroundColor: COLORS.white,
+    borderRadius: 10,
+    padding: 15,
+    height: 150,
+    textAlignVertical: 'top',
+    marginBottom: 25,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    fontFamily: 'Inter-Regular'
+  }
+});
