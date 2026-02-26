@@ -1,44 +1,65 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Platform, View, StyleSheet } from 'react-native';
+import { Alert, Platform, View, StyleSheet, ActivityIndicator } from 'react-native';
 import { AccountSettingsUI } from '@/components/patient/AccountSettingsUI';
 import { authService } from '@/services/authService';
 import AuthLayout from '@/components/AuthLayout';
 import { COLORS } from '@/constants/theme';
+import { STRINGS } from '@/constants/Strings';
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUserData = async () => {
+      try {
+        const response = await authService.getProfile();
+        // Check if response exists and has the email
+        if (response && response.success) {
+          setUserEmail(response.data.email || response.data.mobile || "");
+        }
+      } catch (error) {
+        console.error("Failed to load user email:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUserData();
+  }, []);
 
   const handleLogout = () => {
-    const title = "Logout";
-    const message = "Are you sure you want to logout?";
-
     if (Platform.OS === 'web') {
-      const confirmed = window.confirm(`${title}\n\n${message}`);
+      const confirmed = window.confirm(`${STRINGS.settings.logout}\n\n${STRINGS.settings.confirmLogout}`);
       if (confirmed) performLogout();
     } else {
-      Alert.alert(title, message, [
-        { text: "Cancel", style: 'cancel' },
-        { text: "Logout", style: 'destructive', onPress: performLogout }
+      Alert.alert(STRINGS.settings.logout, STRINGS.settings.confirmLogout, [
+        { text: STRINGS.common.cancel, style: 'cancel' },
+        { text: STRINGS.settings.logout, style: 'destructive', onPress: performLogout }
       ]);
     }
   };
 
   const performLogout = async () => {
-    try {
-      await authService.logout(); 
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
+    await authService.logout(); // The router.replace is already inside your authService.logout
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.screenWrapper}>
-      <AuthLayout>
+      <AuthLayout title={STRINGS.settings.title} subtitle={STRINGS.settings.version}>
         <AccountSettingsUI 
-          userEmail="patient@praman.ai" 
+          userEmail={userEmail} // 🟢 Now dynamic!
           onLogout={handleLogout} 
-          onChangePassword={() => router.push('/auth/change-password')} 
+          onChangePassword={() => router.push(`../(auth)/change-password` as any)}
         />
       </AuthLayout>
     </View>
@@ -46,5 +67,6 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenWrapper: { flex: 1, backgroundColor: COLORS.bgScreen }
+  screenWrapper: { flex: 1, backgroundColor: COLORS.bgScreen },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bgScreen }
 });

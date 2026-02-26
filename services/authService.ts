@@ -31,18 +31,16 @@ export const authService = {
       const { token, user } = response.data;
       
       if (token && user) {
-        // 🛡️ PROD GUARD: Ensure role is always a lowercase string to prevent mismatch
-        // If your backend doesn't send a role for patients, we default it here.
+        // 🛡️ PROD GUARD: Ensure role is always a lowercase string
         const userRole = (user.role || 'patient').toLowerCase();
 
-        // Use Promise.all to ensure storage is locked before returning to the UI
         await Promise.all([
           storage.setItem('userToken', token),
           storage.setItem('userRole', userRole),
           storage.setItem('userName', user.name || '')
         ]);
       }
-      console.log("resop", response.data)
+
       return response.data;
     } catch (error: any) {
       console.error("❌ Login API Error:", error.response?.data || error.message);
@@ -130,7 +128,6 @@ export const authService = {
   logout: async () => {
     try {
       await storage.clearAuth(); 
-      // Use absolute path for reliability
       router.replace('/auth/login');
     } catch (e) {
       console.error("Logout Error:", e);
@@ -148,5 +145,19 @@ export const authService = {
       console.error("❌ Onboarding Error:", error.response?.data);
       throw error;
     }
-  }
+  },
+
+  // 🟢 10. GET CURRENT PROFILE (Fixed to hit /auth/me)
+  getProfile: async () => {
+    try {
+      // Hits router.get('/me', protect, getMe) in your backend authRoutes
+      const response = await API.get('/auth/me');
+      
+      // returns { success: true, data: user }
+      return response.data; 
+    } catch (error: any) {
+      console.error("❌ Get Profile Error:", error.response?.data || error.message);
+      return null;
+    }
+  },
 };

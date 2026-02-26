@@ -19,6 +19,10 @@ export const STRINGS = {
     securityNote: "Your medical information is encrypted and handled securely.",
     white: "#FFF",
     securityDisclaimer: "Your information is protected using secure, medical-grade data handling practices.", //
+    viewReport: "View Original Report",
+    viewPdf: "View PDF",
+    submitting: "Submitting Verdict...",
+    errorTitle: "Action Required",
   },
 
 welcome: {
@@ -122,6 +126,10 @@ welcome: {
     logout: "Logout",
     logoutSub: "Sign out of your account",
     version: "Praman AI v1.0.4 (Beta)", // Updated to match your UI code
+    confirmLogout: "Are you sure you want to sign out?",
+    support: "Help & Support",
+    privacy: "Privacy Policy",
+    terms: "Terms of Service",
   },
 
   confirmation: {
@@ -152,5 +160,14 @@ welcome: {
     assignedCases: "Assigned Cases",
     caseStats: (count: number) => `You have ${count} cases to review today`,
     urgent: "Urgent",
+    verdictTitle: "Clinical Verdict",
+    diagnosisLabel: "FINAL DIAGNOSIS",
+    notesLabel: "RECOMMENDATIONS & NOTES",
+    notesPlaceholder: "Enter clinical recommendations and notes for the patient...",
+    diagnosisPlaceholder: "e.g., Iron Deficiency Anemia",
+    submitVerdict: "Finalize & Send to Patient",
+    caseClosed: "Verdict submitted. Case is now closed.",
+    emptySummary: "No AI summary available for this case.",
+    aiInsights: "AI PRELIMINARY INSIGHTS",
   }
 };
