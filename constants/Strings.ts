@@ -9,6 +9,7 @@ export const STRINGS = {
     login: "Login",
     logInLink: "Log in",
     alreadyAccount: "Already have an account? ",
+    loggedInAs: "Logged in as",
     continue: "Continue",
     loading: 'Loading Report...',
     or: "OR",
@@ -109,18 +110,18 @@ welcome: {
     stepDoctor: "Specialist review in progress",
     estimateTime: "Estimated review time: 24-48 hours",
     backHome: "Back to Dashboard",
-    needHelp: "Need help? Contact support",
+    needHelp: "Help & Support",
     caseSummary: "Case Summary"
   },
 
   settings: {
     title: "Account Settings",
     profile: "Profile",
-    changePassword: "Change Password",
+    updatePassword: "Update Password",
     changePasswordSub: "Update your security credentials",
     logout: "Logout",
     logoutSub: "Sign out of your account",
-    version: "App Version 1.0.4 (Beta)", // Updated to match your UI code
+    version: "Praman AI v1.0.4 (Beta)", // Updated to match your UI code
   },
 
   confirmation: {

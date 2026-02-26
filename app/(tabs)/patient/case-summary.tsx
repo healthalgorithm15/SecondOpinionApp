@@ -11,12 +11,12 @@ import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Design System
-import AuthLayout from '../../components/AuthLayout';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../constants/theme';
-import { STRINGS } from '../../constants/Strings';
+import AuthLayout from '../../../components/AuthLayout';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
+import { STRINGS } from '../../../constants/Strings';
 
 // Logic
-import { patientService } from '../../services/patientService';
+import { patientService } from '../../../services/patientService';
 
 export default function CaseSummary() {
   const router = useRouter();
@@ -146,7 +146,7 @@ export default function CaseSummary() {
     <AuthLayout>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.replace('/(tabs)/patienthome')} style={styles.closeBtn}>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)/patient/patienthome')} style={styles.closeBtn}>
             <Ionicons name="close" size={24} color={COLORS.textMain} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Case Summary</Text>

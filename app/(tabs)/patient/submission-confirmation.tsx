@@ -4,10 +4,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Design System
-import AuthLayout from '../../components/AuthLayout';
-import { PrimaryButton } from '../../components/ui/PrimaryButton';
-import { STRINGS } from '../../constants/Strings';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../constants/theme';
+import AuthLayout from '../../../components/AuthLayout';
+import { PrimaryButton } from '../../../components/ui/PrimaryButton';
+import { STRINGS } from '../../../constants/Strings';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
 
 export default function SubmissionConfirmation() {
   const router = useRouter();
@@ -74,7 +74,7 @@ export default function SubmissionConfirmation() {
             title={STRINGS.confirmation.backToDashboard}
             onPress={() => {
               router.push({
-                pathname: '/(tabs)/case-status' as any,
+                pathname: '/(tabs)/patient/case-status' as any,
                 params: { caseId: params.caseId }
               });
             }}

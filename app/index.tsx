@@ -44,9 +44,9 @@ useEffect(() => {
         } else if (role === 'doctor') {
           // Note: We send doctors to home. If they need activation, 
           // your existing login/otp flow handles that specifically.
-          router.replace('/(tabs)/doctor-home');
+          router.replace('/(tabs)/doctor/doctor-home');
         } else if (role === 'patient') {
-          router.replace('/(tabs)/patienthome');
+          router.replace('/(tabs)/patient/patienthome');
         }
       }
     } catch (e) {

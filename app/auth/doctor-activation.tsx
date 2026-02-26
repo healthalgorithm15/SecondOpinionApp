@@ -17,7 +17,7 @@ export default function DoctorActivationScreen() {
   try {
     await authService.completeOnboarding(passwords.new);
     console.log("account active");
-    router.replace('../(tabs)/doctor-home');
+    router.replace('../(tabs)/doctor/doctor-home');
     /*Alert.alert(
       "Welcome!", 
       "Your account is now active.", 

@@ -55,10 +55,10 @@ export default function OtpVerificationScreen() {
           router.replace('/(tabs)/admin-home');
           break;
         case 'doctor':
-          router.replace('/(tabs)/doctor-home');
+          router.replace('/(tabs)/doctor/doctor-home');
           break;
         case 'patient':
-          router.replace('/(tabs)/patienthome');
+          router.replace('/(tabs)/patient/patienthome');
           break;
         default:
           router.replace('/auth/login');

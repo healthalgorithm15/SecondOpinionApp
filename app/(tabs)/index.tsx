@@ -17,12 +17,12 @@ export default function HomeScreen() {
         if (token) {
           // Deterministic routing based on role
           if (role === 'doctor') {
-            router.replace('/(tabs)/doctor-home');
+            router.replace('/(tabs)/doctor/doctor-home');
           } else if (role === 'admin') {
             router.replace('/(tabs)/admin-home');
           } else {
             // Default to Patient Home as per your mockup flow
-            router.replace('/(tabs)/patienthome');
+            router.replace('/(tabs)/patient/patienthome');
           }
         } else {
           // No token? Back to the Welcome/Login screen

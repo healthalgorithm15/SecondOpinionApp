@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
-import { COLORS } from '../../constants/theme';
+import { COLORS, SHADOWS, TYPOGRAPHY } from '../../constants/theme';
 
 export function BottomNav({ tabs }: { tabs: any[] }) {
   const router = useRouter();
@@ -12,10 +12,10 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
     <View style={styles.container}>
       <View style={styles.contentWrapper}>
         {tabs.map((tab) => {
-          // 🟢 Pro Logic: Matches exact path or the folder segment
-          const isActive = tab.path === '/(tabs)' 
-  ? pathname === '/(tabs)' || pathname === '/' 
-  : pathname.includes(tab.path);
+          // 🟢 Pro Logic: Handles both root path and group paths correctly
+          const isActive = tab.path === '' || tab.path === '/(tabs)'
+            ? pathname === '/' || pathname === '/index'
+            : pathname.includes(tab.path.replace('/(tabs)', ''));
           
           return (
             <TouchableOpacity 
@@ -27,9 +27,12 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
               <Ionicons 
                 name={isActive ? (tab.icon as any) : `${tab.icon}-outline`} 
                 size={24} 
-                color={isActive ? COLORS.secondary : '#94A3B8'} 
+                color={isActive ? COLORS.secondary : COLORS.textSub} 
               />
-              <Text style={[styles.tabLabel, { color: isActive ? COLORS.secondary : '#94A3B8' }]}>
+              <Text style={[
+                styles.tabLabel, 
+                { color: isActive ? COLORS.secondary : COLORS.textSub }
+              ]}>
                 {tab.name}
               </Text>
               {isActive && <View style={styles.activeIndicator} />}
@@ -44,33 +47,34 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 20 : 80, // 🟢 Lifts the bar above system navigation
-    left: 0,
-    right: 0,
+    bottom: Platform.OS === 'ios' ? 30 : 20, 
+    left: 20,
+    right: 20,
     backgroundColor: 'transparent',
   },
   contentWrapper: {
     flexDirection: 'row',
     backgroundColor: COLORS.overlay,
-    borderRadius: 5, // 🟢 Smooth rounding as seen in your mockup
+    borderRadius: 20, 
     height: 70,
-    // 🟢 Elevated shadow for the "floating" effect
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 15,
-    elevation: 10,
+    ...SHADOWS.soft,
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
   },
   tabItem: { alignItems: 'center', flex: 1 },
-  tabLabel: { fontSize: 10, fontFamily: 'Inter-Medium', marginTop: 2 },
- activeIndicator: {
-  width: 4,
-  height: 4,
-  borderRadius: 2, // Re-enable for the circular dot in mockup
-  backgroundColor: COLORS.secondary, // Use secondary for the teal highlight
-  marginTop: 4,
-}
+  tabLabel: { 
+    ...TYPOGRAPHY.caption, 
+    fontSize: 10, 
+    marginTop: 2 
+  },
+  activeIndicator: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.secondary,
+    marginTop: 4,
+  }
 });

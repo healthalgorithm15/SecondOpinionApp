@@ -7,12 +7,12 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 // Design System
-import AuthLayout from '../../components/AuthLayout';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../constants/theme';
-import { STRINGS } from '../../constants/Strings';
+import AuthLayout from '../../../components/AuthLayout';
+import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
+import { STRINGS } from '../../../constants/Strings';
 
 // Logic
-import { doctorService } from '../../services/doctorService';
+import { doctorService } from '../../../services/doctorService';
 
 export default function DoctorHomeScreen() {
   const router = useRouter();

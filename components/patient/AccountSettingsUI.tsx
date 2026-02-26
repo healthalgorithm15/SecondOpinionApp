@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, TYPOGRAPHY, BORDER_RADIUS } from '@/constants/theme';
+import { COLORS, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '@/constants/theme';
+import { STRINGS } from '@/constants/Strings';
 
 interface Props {
   userEmail: string;
@@ -11,105 +12,119 @@ interface Props {
 
 export const AccountSettingsUI = ({ userEmail, onLogout, onChangePassword }: Props) => {
   return (
-    <View style={styles.mainContainer}>
-      <Text style={styles.headerTitle}>Account Settings</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.mainContainer}>
+        {/* Header from Strings.ts */}
+        <Text style={styles.headerTitle}>{STRINGS.settings.title}</Text>
 
-      {/* ⚪ THE GLASS CARD */}
-      <View style={styles.glassCard}>
-        
-        {/* Email Display Section */}
-        <View style={styles.infoSection}>
-          <Text style={styles.label}>Logged in as</Text>
-          <Text style={styles.emailText}>{userEmail}</Text>
+        {/* ⚪ THE GLASS CARD - Matches your mockup style */}
+        <View style={styles.glassCard}>
+          
+          {/* Email Display Section */}
+          <View style={styles.infoSection}>
+            <Text style={styles.label}>{STRINGS.common.loggedInAs}</Text>
+            <Text style={styles.emailText}>{userEmail}</Text>
+          </View>
+
+          <View style={styles.separator} />
+
+          {/* Update Password Action */}
+          <TouchableOpacity 
+            style={styles.menuItem} 
+            onPress={onChangePassword}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <Ionicons name="lock-closed-outline" size={22} color={COLORS.secondary} />
+              <Text style={styles.menuText}>{STRINGS.settings.updatePassword}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.border} />
+          </TouchableOpacity>
+
+          {/* Help & Support Action */}
+          <TouchableOpacity 
+            style={styles.menuItem} 
+            onPress={() => {}}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <Ionicons name="help-circle-outline" size={22} color={COLORS.secondary} />
+              <Text style={styles.menuText}>{STRINGS.status.needHelp}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={COLORS.border} />
+          </TouchableOpacity>
+
+          {/* Logout Action */}
+          <TouchableOpacity 
+            style={[styles.menuItem, { borderBottomWidth: 0 }]} 
+            onPress={onLogout}
+            activeOpacity={0.7}
+          >
+            <View style={styles.menuLeft}>
+              <Ionicons name="log-out-outline" size={22} color={COLORS.error} />
+              <Text style={[styles.menuText, { color: COLORS.error }]}>{STRINGS.settings.logout}</Text>
+            </View>
+          </TouchableOpacity>
         </View>
-
-        <View style={styles.separator} />
-
-        {/* Change Password Action */}
-        <TouchableOpacity style={styles.menuItem} onPress={onChangePassword}>
-          <View style={styles.menuLeft}>
-            <Ionicons name="lock-closed-outline" size={22} color={COLORS.secondary} />
-            <Text style={styles.menuText}>Update Password</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-        </TouchableOpacity>
-
-        {/* Support Action */}
-        <TouchableOpacity style={styles.menuItem} onPress={() => {}}>
-          <View style={styles.menuLeft}>
-            <Ionicons name="help-circle-outline" size={22} color={COLORS.secondary} />
-            <Text style={styles.menuText}>Help & Support</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#CBD5E1" />
-        </TouchableOpacity>
-
-        {/* Logout Action (Destructive) */}
-        <TouchableOpacity 
-          style={[styles.menuItem, { borderBottomWidth: 0 }]} 
-          onPress={onLogout}
-        >
-          <View style={styles.menuLeft}>
-            <Ionicons name="log-out-outline" size={22} color={COLORS.error} />
-            <Text style={[styles.menuText, { color: COLORS.error }]}>Logout</Text>
-          </View>
-        </TouchableOpacity>
+        
+        {/* Version Number from Strings.ts */}
+        <Text style={styles.versionText}>{STRINGS.settings.version}</Text>
       </View>
-      
-      <Text style={styles.versionText}>Praman AI v1.0.4 (Beta)</Text>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: 'transparent', // Let the background image show through
+  },
   mainContainer: { 
+    flex: 1,
     width: '100%', 
     alignItems: 'center', 
-    paddingTop: 10 
+    paddingTop: 40 
   },
   headerTitle: { 
     ...TYPOGRAPHY.header, 
     color: COLORS.primary, 
-    marginBottom: 20 
+    marginBottom: 30,
+    textAlign: 'center'
   },
   glassCard: {
-    width: '94%',
+    width: '90%',
     backgroundColor: COLORS.glassBg,
     borderRadius: BORDER_RADIUS.card,
-    padding: 20,
+    padding: 24,
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
-    // Soft shadow to match the buttons
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2
+    ...SHADOWS.soft, // Using your centralized shadow
   },
   infoSection: { 
-    marginBottom: 15, 
+    marginBottom: 10, 
     paddingHorizontal: 5 
   },
   label: { 
-    fontFamily: 'Inter-Medium', 
-    fontSize: 12, 
+    ...TYPOGRAPHY.caption,
     color: COLORS.textSub, 
-    marginBottom: 4 
+    marginBottom: 4,
+    fontSize: 13
   },
   emailText: { 
-    fontFamily: 'Inter-SemiBold', 
-    fontSize: 16, 
+    ...TYPOGRAPHY.boldText,
+    fontSize: 18, 
     color: COLORS.textMain 
   },
   separator: { 
     height: 1, 
     backgroundColor: 'rgba(0,0,0,0.05)', 
-    marginVertical: 10 
+    marginVertical: 15 
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 15,
+    paddingVertical: 16,
     paddingHorizontal: 5,
   },
   menuLeft: { 
@@ -118,13 +133,15 @@ const styles = StyleSheet.create({
     gap: 12 
   },
   menuText: { 
-    fontFamily: 'Inter-Medium', 
-    fontSize: 15, 
+    ...TYPOGRAPHY.body,
+    fontFamily: 'Inter-Medium',
+    fontSize: 16,
     color: COLORS.textMain 
   },
   versionText: { 
     ...TYPOGRAPHY.disclaimer, 
-    marginTop: 20, 
-    color: COLORS.textSub 
+    marginTop: 40, 
+    color: COLORS.textSub,
+    opacity: 0.7
   }
 });
