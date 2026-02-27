@@ -5,14 +5,27 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native'; // 🟢 Added for screen focus detection
 
 // Design System
 import AuthLayout from '../../../components/AuthLayout';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
 import { STRINGS } from '../../../constants/Strings';
 
-// Logic
+// Logic & Real-time
 import { doctorService } from '../../../services/doctorService';
+import { socketService } from '@/services/socketService';
+import { storage } from '@/utils/storage'; 
+
+/**
+ * 🟢 Define the shape of the Socket Event Data
+ */
+interface NewCasePayload {
+  caseId: string;
+  patientName: string;
+  riskLevel: 'Low' | 'Medium' | 'High';
+  summary: string;
+}
 
 export default function DoctorHomeScreen() {
   const router = useRouter();
@@ -21,15 +34,13 @@ export default function DoctorHomeScreen() {
   const [cases, setCases] = useState<any[]>([]);
 
   /**
-   * 🔄 Fetch Live Worklist (PENDING_DOCTOR status)
+   * 🔄 Fetch Live Worklist
    */
   const fetchWorklist = useCallback(async () => {
     try {
       const res = await doctorService.getPendingCases();
       if (res.success) {
         setCases(res.data);
-      } else {
-        console.error("Fetch failed:", res.message);
       }
     } catch (error) {
       console.error("❌ Worklist error:", error);
@@ -39,10 +50,59 @@ export default function DoctorHomeScreen() {
     }
   }, []);
 
+  /**
+   * 🎯 FOCUS TRIGGER: This ensures the list updates when navigating back
+   * from the review screen. This solves the "case still showing as pending" issue.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      fetchWorklist();
+    }, [fetchWorklist])
+  );
+
+  /**
+   * ⚡ Real-time Socket Listener & Initialization
+   */
   useEffect(() => {
-    fetchWorklist();
-    // One-time welcome alert (Optional: remove if it's annoying)
-    // Alert.alert(STRINGS.doctor.welcomeTitle, STRINGS.doctor.activationMsg);
+    const initializeSocket = async () => {
+      const userId = await storage.getItem('userId');
+      
+      if (userId) {
+        socketService.connect();
+        socketService.joinRoom({ 
+          userId: userId, 
+          role: 'doctor' 
+        });
+        console.log("🔗 Socket connected and linked for User:", userId);
+      }
+    };
+
+    initializeSocket();
+
+    // Listen for "newCase" emitted by the backend
+    socketService.on('newCase', (data: NewCasePayload) => {
+      console.log("🚨 New Case Received via Socket:", data);
+      fetchWorklist();
+
+      Alert.alert(
+        "🚨 New Case Assigned",
+        `Patient ${data.patientName} requires a ${data.riskLevel} priority review.`,
+        [
+          { text: "Dismiss", style: "cancel" },
+          { 
+            text: "View Now", 
+            onPress: () => router.push({
+              pathname: '/(tabs)/doctor-review/[caseId]',
+              params: { caseId: data.caseId }
+            } as any)
+          }
+        ]
+      );
+    });
+
+    return () => {
+      socketService.off('newCase');
+    };
   }, [fetchWorklist]);
 
   const onRefresh = () => {
@@ -54,7 +114,6 @@ export default function DoctorHomeScreen() {
    * 🎨 Render Individual Case Card
    */
   const renderCaseItem = ({ item }: { item: any }) => {
-    // 🟢 UPDATED: Priority is now determined by AI Risk Assessment
     const isUrgent = item.aiAnalysis?.riskLevel === 'High';
     
     return (
@@ -62,7 +121,6 @@ export default function DoctorHomeScreen() {
         style={styles.caseCard}
         activeOpacity={0.8}
         onPress={() => router.push({
-          // 🔗 Navigation now points to the dynamic [caseId] template
           pathname: '/(tabs)/doctor-review/[caseId]',
           params: { caseId: item._id }
         } as any)}
@@ -117,7 +175,7 @@ export default function DoctorHomeScreen() {
               data={cases}
               renderItem={renderCaseItem}
               keyExtractor={(item) => item._id}
-              scrollEnabled={false} // AuthLayout usually handles the main scroll
+              scrollEnabled={true} 
               ListEmptyComponent={
                 !loading ? (
                   <View style={styles.emptyContainer}>

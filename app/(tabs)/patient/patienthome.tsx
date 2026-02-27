@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
-// 🟢 Your Patient UI Components
+
 import { PatientNewUI, PatientExistingUI } from '../../../components/patient'; 
 
-// 🔴 REMOVED BottomNav import - Layout handles this now
+
 
 import { patientService } from '../../../services/patientService';
 import { COLORS } from '../../../constants/theme';

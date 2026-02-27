@@ -1,21 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   View, 
   Text, 
   ScrollView, 
   ActivityIndicator, 
   TextInput, 
-  Alert, 
   StyleSheet, 
   TouchableOpacity,
   KeyboardAvoidingView,
-  Platform 
+  Platform,
+  Modal,
+  Animated
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
 
-// --- YOUR DESIGN SYSTEM & COMPONENTS ---
+// --- DESIGN SYSTEM ---
 import AuthLayout from '../../../components/AuthLayout';
 import { PrimaryButton } from '../../../components/ui/PrimaryButton';
 import { doctorService } from '../../../services/doctorService';
@@ -26,11 +27,47 @@ export default function DoctorReviewDetail() {
   const { caseId } = useLocalSearchParams();
   const router = useRouter();
   
+  // Data States
   const [caseData, setCaseData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [diagnosis, setDiagnosis] = useState('');
   const [summary, setSummary] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 🟢 Unified Modal State
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    title: '',
+    message: '',
+    type: 'success' as 'success' | 'error',
+    onConfirm: () => {}
+  });
+
+  // Animation State
+  const scaleValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (modalVisible) {
+      Animated.spring(scaleValue, {
+        toValue: 1,
+        friction: 6,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      scaleValue.setValue(0);
+    }
+  }, [modalVisible]);
+
+  // Helper to trigger our custom Modal instead of Alert
+  const showAppAlert = (title: string, message: string, type: 'success' | 'error' = 'error', onConfirm?: () => void) => {
+    setModalConfig({
+      title,
+      message,
+      type,
+      onConfirm: onConfirm || (() => setModalVisible(false))
+    });
+    setModalVisible(true);
+  };
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -45,7 +82,7 @@ export default function DoctorReviewDetail() {
           }
         }
       } catch (error) {
-        Alert.alert(STRINGS.common.appName, STRINGS.validation.networkError);
+        showAppAlert(STRINGS.common.appName, STRINGS.validation.networkError);
       } finally {
         setLoading(false);
       }
@@ -55,7 +92,7 @@ export default function DoctorReviewDetail() {
 
   const handleViewFile = async () => {
     const recordId = caseData?.recordId?._id || caseData?.recordId;
-    if (!recordId) return Alert.alert(STRINGS.common.appName, "No file found.");
+    if (!recordId) return showAppAlert(STRINGS.common.appName, "No medical file associated with this case.");
     
     const url = `${process.env.EXPO_PUBLIC_API_URL}/api/patient/record/view/${recordId}`;
     await WebBrowser.openBrowserAsync(url);
@@ -63,7 +100,7 @@ export default function DoctorReviewDetail() {
 
   const handleSubmit = async () => {
     if (!diagnosis.trim() || !summary.trim()) {
-      return Alert.alert(STRINGS.common.appName, STRINGS.doctor.caseStats(0).includes('urgent') ? "Required fields missing" : "Please fill all fields");
+      return showAppAlert(STRINGS.common.appName, "Clinical findings and diagnosis are required.");
     }
 
     setIsSubmitting(true);
@@ -74,15 +111,15 @@ export default function DoctorReviewDetail() {
       });
 
       if (res.success) {
-        // 🏁 LANDING LOGIC: Back to Doctor Home after Success
-        Alert.alert(
+        showAppAlert(
           STRINGS.common.appName, 
           STRINGS.doctor.caseClosed, 
-          [{ text: "OK", onPress: () => router.replace('/(tabs)/doctor/doctor-home') }]
+          'success',
+          () => router.replace('/(tabs)/doctor/doctor-home')
         );
       }
     } catch (error) {
-      Alert.alert(STRINGS.common.appName, STRINGS.validation.networkError);
+      showAppAlert(STRINGS.common.appName, "Failed to submit review. Please check your connection.");
     } finally {
       setIsSubmitting(false);
     }
@@ -168,6 +205,33 @@ export default function DoctorReviewDetail() {
           <View style={{ height: 50 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* 🟢 DYNAMIC APP MODAL (Replaces all Alerts) */}
+      <Modal visible={modalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <Animated.View style={[styles.modalContent, { transform: [{ scale: scaleValue }] }]}>
+            <View style={[styles.iconCircle, { backgroundColor: modalConfig.type === 'success' ? 'rgba(30, 125, 117, 0.1)' : 'rgba(239, 68, 68, 0.1)' }]}>
+              <Ionicons 
+                name={modalConfig.type === 'success' ? "checkmark-done" : "warning-outline"} 
+                size={40} 
+                color={modalConfig.type === 'success' ? COLORS.secondary : '#EF4444'} 
+              />
+            </View>
+            <Text style={styles.modalTitle}>{modalConfig.title}</Text>
+            <Text style={styles.modalSubtitle}>{modalConfig.message}</Text>
+            
+            <TouchableOpacity 
+              style={[styles.modalButton, { backgroundColor: modalConfig.type === 'success' ? COLORS.primary : '#EF4444' }]} 
+              onPress={() => {
+                setModalVisible(false);
+                modalConfig.onConfirm();
+              }}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
     </AuthLayout>
   );
 }
@@ -205,5 +269,14 @@ const styles = StyleSheet.create({
   input: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.md, padding: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20 },
   textArea: { height: 100, textAlignVertical: 'top' },
   cancelLink: { marginTop: 15, alignItems: 'center' },
-  cancelText: { color: COLORS.textSub, fontSize: 14 }
+  cancelText: { color: COLORS.textSub, fontSize: 14 },
+
+  // MODAL STYLES
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '85%', backgroundColor: 'white', borderRadius: 24, padding: 25, alignItems: 'center', ...SHADOWS.soft },
+  iconCircle: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
+  modalTitle: { ...TYPOGRAPHY.header, color: COLORS.primary, fontSize: 20, marginBottom: 10 },
+  modalSubtitle: { ...TYPOGRAPHY.body, color: COLORS.textSub, textAlign: 'center', marginBottom: 25 },
+  modalButton: { paddingVertical: 14, borderRadius: BORDER_RADIUS.md, width: '100%', alignItems: 'center' },
+  modalButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });

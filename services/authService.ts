@@ -160,4 +160,15 @@ export const authService = {
       return null;
     }
   },
+
+  updateProfile: async (data: { pushToken?: string; name?: string }) => {
+    try {
+      // Hits router.patch('/profile', protect, authController.updateProfile)
+      const response = await API.patch('/auth/profile', data);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Update Profile Error:", error.response?.data || error.message);
+      throw error;
+    }
+  },
 };

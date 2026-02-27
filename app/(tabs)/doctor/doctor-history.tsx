@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import AuthLayout from '../../../components/AuthLayout';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
 import { doctorService } from '../../../services/doctorService';
@@ -15,12 +16,14 @@ export default function DoctorHistory() {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchHistory = async (pageNumber: number, shouldAppend: boolean = false) => {
+  const fetchHistory = useCallback(async (pageNumber: number, shouldAppend: boolean = false) => {
     try {
-      if (pageNumber === 1 && !refreshing) setLoading(true);
+      // Only show main loader on first ever load
+      if (pageNumber === 1 && !refreshing && !loadingMore) setLoading(true);
+      
       const res = await doctorService.getDoctorHistory(pageNumber, 10);
       if (res.success) {
-        const newData = res.data;
+        const newData = res.data || [];
         setHistory(prev => shouldAppend ? [...prev, ...newData] : newData);
         setHasMore(newData.length === 10); 
       }
@@ -31,15 +34,20 @@ export default function DoctorHistory() {
       setRefreshing(false);
       setLoadingMore(false);
     }
-  };
+  }, [refreshing, loadingMore]);
 
-  useEffect(() => { fetchHistory(1); }, []);
+  useFocusEffect(
+    useCallback(() => {
+      setPage(1);
+      fetchHistory(1, false);
+    }, [fetchHistory])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     setPage(1);
-    fetchHistory(1);
-  }, []);
+    fetchHistory(1, false);
+  }, [fetchHistory]);
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore && !loading) {
@@ -50,7 +58,6 @@ export default function DoctorHistory() {
     }
   };
 
-  // 🟢 1. The Header is now a function to be used inside FlatList
   const renderHeader = () => (
     <View style={styles.headerContainer}>
       <View style={styles.headerRow}>
@@ -66,7 +73,6 @@ export default function DoctorHistory() {
   };
 
   return (
-    // 🟢 2. Disable the parent ScrollView
     <AuthLayout scrollEnabled={false}>
       {loading && page === 1 ? (
         <View style={styles.center}>
@@ -76,14 +82,13 @@ export default function DoctorHistory() {
         <FlatList
           data={history}
           keyExtractor={(item) => item._id}
-          // 🟢 3. The "Title" section is now part of the list itself
           ListHeaderComponent={renderHeader}
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={styles.card}
               activeOpacity={0.7}
               onPress={() => router.push({
-                pathname: "/doctor-review/[caseId]" as any,
+                pathname: "/(tabs)/doctor-review/[caseId]" as any,
                 params: { caseId: item._id }
               })}
             >
@@ -91,7 +96,7 @@ export default function DoctorHistory() {
                 <View style={styles.infoSection}>
                   <Text style={styles.patientName}>{item.patientId?.name || 'Unknown Patient'}</Text>
                   <Text style={styles.date}>
-                    Completed: {new Date(item.updatedAt).toLocaleDateString()}
+                    Completed: {item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : 'N/A'}
                   </Text>
                   <View style={styles.verdictBadge}>
                     <Text style={styles.verdictText} numberOfLines={1}>
@@ -103,19 +108,18 @@ export default function DoctorHistory() {
               </View>
             </TouchableOpacity>
           )}
-          // 🟢 4. Infinite scroll & Refresh props
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.5}
           ListFooterComponent={renderFooter}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.secondary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.secondary} />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
+              <Ionicons name="document-text-outline" size={50} color={COLORS.border} />
               <Text style={styles.empty}>No completed reviews found.</Text>
             </View>
           }
-          // 🟢 5. This makes the list fill the screen properly
           contentContainerStyle={styles.listContent}
         />
       )}
@@ -124,14 +128,11 @@ export default function DoctorHistory() {
 }
 
 const styles = StyleSheet.create({
-  // Container logic
-  listContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 20, flexGrow: 1 },
   headerContainer: { paddingTop: 10, paddingBottom: 10 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  
-  // UI logic
   title: { ...TYPOGRAPHY.header, color: COLORS.primary },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', minHeight: 300 },
   card: { 
     backgroundColor: 'white', 
     borderRadius: BORDER_RADIUS.md, 
@@ -155,6 +156,6 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   verdictText: { fontSize: 12, color: COLORS.secondary, fontWeight: '600' },
-  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 80 },
   empty: { textAlign: 'center', marginTop: 10, color: COLORS.textSub, ...TYPOGRAPHY.boldText }
 });

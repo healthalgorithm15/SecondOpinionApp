@@ -15,9 +15,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
 import AuthLayout from '../../components/AuthLayout';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
-import { COLORS, BORDER_RADIUS } from '../../constants/theme';
+import { COLORS } from '../../constants/theme';
 import { authService } from '@/services/authService';
 import { storage } from '@/utils/storage'; 
+
+// 🟢 Services for Real-time & Notifications
+import { socketService } from '@/services/socketService';
+import { registerForPushNotificationsAsync } from '@/hooks/useNotifications';
 
 export default function OtpVerificationScreen() {
   const { identifier, mode } = useLocalSearchParams<{ identifier: string; mode: string }>();
@@ -26,7 +30,10 @@ export default function OtpVerificationScreen() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // 🟢 LOGIC UNTOUCHED
+  /**
+   * handleVerifyOtp
+   * Verifies the 2FA code and initializes background services
+   */
   const handleVerifyOtp = async () => {
     if (otp.length < 4) return setErrorMsg("Please enter the verification code.");
     setLoading(true);
@@ -35,19 +42,50 @@ export default function OtpVerificationScreen() {
     const verificationMode = (mode || 'login') as 'login' | 'reset';
 
     try {
+      // 1. Verify OTP with Backend
       const response = await authService.verifyOTP(identifier, otp, verificationMode);
-      console.log("response in otp", response);
       const { user, token } = response.data;
 
-      if (user?.role === 'doctor' && user?.isFirstLogin) {
-        if (token) await storage.setItem('userToken', token);
-        console.log("before doc activation")
-        return router.replace('/auth/doctor-activation');
+      // 2. Persist Auth Session
+      if (token) {
+    await storage.setItem('userToken', token);
+    
+    // 🟢 ADD THIS LINE: Save the userId so other screens can use it
+    if (user?._id) await storage.setItem('userId', user._id); 
+
+    if (user?.name) await storage.setItem('userName', user.name);
+  }
+
+     
+
+      // 🟢 3. BACKGROUND SERVICES (Real-time & Push)
+      // Wrapped in a separate try/catch so failures here don't block navigation
+
+      
+      if (verificationMode === 'login' && user) {
+        try {
+          // Connect to Socket.io
+          socketService.connect();
+          socketService.joinRoom({ 
+        userId: user._id, 
+        role: user.role 
+      });
+
+          // Get Push Token and update profile
+          const pushToken = await registerForPushNotificationsAsync();
+          if (pushToken) {
+            await authService.updateProfile({ pushToken });
+            console.log("✅ Push token registered successfully");
+          }
+        } catch (bgError) {
+          // We log the error but don't stop the user from entering the app
+          console.error("⚠️ Background Service Init Failed:", bgError);
+        }
       }
 
-      if (token) {
-        await storage.setItem('userToken', token);
-        if (user?.name) await storage.setItem('userName', user.name);
+      // 4. Role-Based Navigation Logic
+      if (user?.role === 'doctor' && user?.isFirstLogin) {
+        return router.replace('/auth/doctor-activation');
       }
 
       switch (user?.role) {
@@ -65,7 +103,8 @@ export default function OtpVerificationScreen() {
           break;
       }
     } catch (error: any) {
-      setErrorMsg(error.response?.data?.message || "Invalid OTP");
+      console.error("❌ OTP Verification Error:", error);
+      setErrorMsg(error.response?.data?.message || "Invalid or expired OTP");
     } finally {
       setLoading(false);
     }
@@ -76,14 +115,12 @@ export default function OtpVerificationScreen() {
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={styles.flexContainer}
-        keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}
       >
         <ScrollView 
           contentContainerStyle={styles.scrollContent} 
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* 🟢 THE UI FIX: Glass card with specific alignment to pull it UP */}
           <View style={styles.glassCard}>
             {errorMsg && (
               <View style={styles.errorBox}>
@@ -114,7 +151,10 @@ export default function OtpVerificationScreen() {
 
             <View style={styles.resendContainer}>
               <Text style={styles.resendText}>Didn't receive the code?</Text>
-              <TouchableOpacity activeOpacity={0.7}>
+              <TouchableOpacity 
+                activeOpacity={0.7}
+                onPress={() => authService.resendOTP(identifier)}
+              >
                 <Text style={styles.resendLink}>Resend Code</Text>
               </TouchableOpacity>
             </View>
@@ -132,13 +172,10 @@ const styles = StyleSheet.create({
   scrollContent: { 
     flexGrow: 1,
     paddingHorizontal: 20,
-    // 🟢 CRITICAL: Force alignment to the top so we can control position with marginTop
     justifyContent: 'flex-start', 
     paddingBottom: 40,
   },
   glassCard: {
-    // 🟢 CHANGE THIS VALUE to move the card exactly where you want it
-    // Increase for more space from top, decrease to pull it higher
     marginTop: 10, 
     backgroundColor: 'rgba(255, 255, 255, 0.97)', 
     borderRadius: 28,

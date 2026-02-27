@@ -1,50 +1,77 @@
-import React, { useEffect, useState } from 'react';
-import { Tabs } from 'expo-router';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Tabs, usePathname } from 'expo-router'; // 🟢 Added usePathname
 import { BottomNav } from '../../components/ui/BottomNav';
 import { storage } from '../../utils/storage';
 import { patientService } from '../../services/patientService';
+import { doctorService } from '../../services/doctorService';
+import { socketService } from '@/services/socketService';
 
 export default function TabLayout() {
+  const pathname = usePathname(); // 🟢 This detects every screen change
   const [role, setRole] = useState<string | null>(null);
-  const [isCaseCompleted, setIsCaseCompleted] = useState(false);
+  const [isPatientHistoryVisible, setIsPatientHistoryVisible] = useState(false);
+  const [isDoctorHistoryVisible, setIsDoctorHistoryVisible] = useState(false);
 
+  /**
+   * 🔄 Unified check function
+   */
+  const checkHistoryStatus = useCallback(async (currentRole: string) => {
+    try {
+      if (currentRole === 'patient') {
+        const res = await patientService.getReviewHistory();
+        if (res.success && Array.isArray(res.data)) {
+          const hasFinished = res.data.some((c: any) => 
+            c.status?.trim().toUpperCase() === "COMPLETED"
+          );
+          setIsPatientHistoryVisible(hasFinished);
+        }
+      } else if (currentRole === 'doctor') {
+        const res = await doctorService.getDoctorHistory(1, 1);
+        if (res.success && Array.isArray(res.data)) {
+          setIsDoctorHistoryVisible(res.data.length > 0);
+        }
+      }
+    } catch (err) {
+      console.warn(`${currentRole} history check failed`);
+    }
+  }, []);
+
+  /**
+   * ⚡ EFFECT 1: Initialization & Socket Listener
+   */
   useEffect(() => {
     const initializeLayout = async () => {
-      try {
-        // 1. Get User Role
-        const savedRole = await storage.getItem('userRole');
-        const currentRole = savedRole ? savedRole.toLowerCase() : 'patient';
-        setRole(currentRole);
-  
-        // 2. Logic for History Visibility
-        if (currentRole === 'patient') {
-  // 1. Fetch all cases from the ReviewCase collection
-  const res = await patientService.getReviewHistory(); 
-   console.log("curent roledsfdfdfdfds", res);
-  if (res.success && Array.isArray(res.data)) {
-    // 2. Check if any case is "COMPLETED"
-    const hasFinished = res.data.some((c: any) => 
-      c.status?.trim().toUpperCase() === "COMPLETED"
-    );
-    
-    console.log("hasFinished result:", hasFinished);
-    setIsCaseCompleted(hasFinished);
-  }
+      const savedRole = await storage.getItem('userRole');
+      const currentRole = savedRole ? savedRole.toLowerCase() : 'patient';
+      setRole(currentRole);
+      
+      await checkHistoryStatus(currentRole);
 
-
-   
-  }
-        
-      } catch (error) {
-        console.warn("Layout sync failed, defaulting to basic tabs.");
-      }
+      // Listen for socket events
+      socketService.on('caseCompleted', () => {
+        console.log("⚡ Case Completed Socket Event");
+        checkHistoryStatus(currentRole);
+      });
     };
+
     initializeLayout();
-  }, []);
+    return () => { socketService.off('caseCompleted'); };
+  }, [checkHistoryStatus]);
+
+  /**
+   * 🎯 EFFECT 2: Refresh on Navigation
+   * This forces the Bottom Nav to re-calculate visibility every time 
+   * the user moves between screens (like coming back from a review).
+   */
+  useEffect(() => {
+    if (role) {
+      checkHistoryStatus(role);
+    }
+  }, [pathname, role, checkHistoryStatus]);
 
   const patientTabs = [
     { name: 'Home', icon: 'home', path: '/(tabs)/patient/patienthome' },
-    ...(isCaseCompleted 
+    ...(isPatientHistoryVisible 
       ? [{ name: 'History', icon: 'chatbubble-ellipses', path: '/(tabs)/patient/history' }] 
       : []),
     { name: 'Settings', icon: 'settings', path: '/(tabs)/settings' },
@@ -52,7 +79,9 @@ export default function TabLayout() {
 
   const doctorTabs = [
     { name: 'Cases', icon: 'list', path: '/(tabs)/doctor/doctor-home' },
-  { name: 'Reviews', icon: 'analytics', path: '/(tabs)/doctor/doctor-history' },
+    ...(isDoctorHistoryVisible 
+      ? [{ name: 'Reviews', icon: 'analytics', path: '/(tabs)/doctor/doctor-history' }] 
+      : []),
     { name: 'Settings', icon: 'settings', path: '/(tabs)/settings' },
   ];
 
@@ -67,7 +96,6 @@ export default function TabLayout() {
       <Tabs.Screen name="settings" />
       <Tabs.Screen name="doctor/doctor-home" /> 
       <Tabs.Screen name="doctor/doctor-history" /> 
-      {/* Kept your existing dynamic route logic */}
       <Tabs.Screen name="doctor-review/[caseId]" options={{ href: null }} />
       <Tabs.Screen name="patient/case-summary" options={{ href: null }} />
     </Tabs>
