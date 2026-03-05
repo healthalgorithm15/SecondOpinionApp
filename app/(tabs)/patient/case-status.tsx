@@ -19,15 +19,10 @@ export default function CaseStatus() {
   const router = useRouter();
   const { caseId } = useLocalSearchParams();
   
-  // States
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [caseData, setCaseData] = useState<any>(null);
 
-  /**
-   * 🔄 Fetch Current Case Status
-   * This is now a standalone function we can call on mount or on pull-to-refresh
-   */
   const fetchStatus = async () => {
     try {
       const idToFetch = Array.isArray(caseId) ? caseId[0] : caseId;
@@ -37,52 +32,41 @@ export default function CaseStatus() {
       
       if (res.success) {
         setCaseData(res.data);
-      } else {
-        // If the server says unauthorized (token expired/changed)
-        if (res.status === 401) {
-          Alert.alert("Session Expired", "Please log in again to view your case status.");
-          router.replace('../auth/login');
-        }
+      } else if (res.status === 401) {
+        router.replace('../auth/login');
       }
     } catch (error) {
-      console.error("❌ Error fetching case status:", error);
+      console.error("❌ Error fetching status:", error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   };
 
-  /**
-   * ☝️ Pull-to-Refresh Logic
-   */
+  useEffect(() => {
+    fetchStatus();
+  }, [caseId]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchStatus();
   }, [caseId]);
 
-  /**
-   * ⏲️ Effect Hook
-   * Only runs ONCE when the page loads. No more continuous intervals.
-   */
-  useEffect(() => {
-    fetchStatus();
-  }, [caseId]);
-
-  // Logic Helpers
+  // --- 🛠️ SIMPLIFIED PRODUCTION LOGIC ---
+  const currentStatus = caseData?.status?.toUpperCase() || '';
+  
+  // The button only unlocks when the specialist has finished everything
+  const isProcessComplete = ['COMPLETED', 'REVIEWED'].includes(currentStatus);
+  
   const displayId = typeof caseId === 'string' 
     ? caseId.slice(-8).toUpperCase() 
-    : Array.isArray(caseId) ? caseId[0].slice(-8).toUpperCase() : 'N/A';
-
-  const isAiDone = caseData?.uiSteps?.aiCompleted || ['PENDING_DOCTOR', 'COMPLETED'].includes(caseData?.status);
-  const isDoctorDone = caseData?.uiSteps?.doctorStarted || caseData?.status === 'COMPLETED';
-  const isProcessComplete = caseData?.status === 'COMPLETED';
+    : 'N/A';
 
   if (loading && !caseData) {
     return (
       <AuthLayout>
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={COLORS.secondary} />
-          <Text style={styles.loadingText}>Loading case status...</Text>
         </View>
       </AuthLayout>
     );
@@ -92,83 +76,48 @@ export default function CaseStatus() {
     <AuthLayout>
       <ScrollView 
         contentContainerStyle={styles.scrollContent} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={onRefresh} 
-            tintColor={COLORS.secondary}
-            colors={[COLORS.secondary]} // Android
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.secondary} />}
       >
-        
         <View style={styles.headerSection}>
-          <Text style={styles.appName}>{STRINGS.common.appName}</Text>
-          <Text style={styles.title}>{STRINGS.status.title}</Text>
-          <Text style={styles.subtitle}>Swipe down to refresh for updates from your specialist.</Text>
+          <Ionicons name="cloud-done-outline" size={60} color={COLORS.secondary} />
+          <Text style={styles.title}>Documents Submitted</Text>
+          <Text style={styles.caseIdText}>Case ID: {displayId}</Text>
         </View>
 
-        <View style={styles.glassCard}>
-          <View style={styles.idBadge}>
-            <Text style={styles.caseLabel}>
-              Case ID: <Text style={styles.caseValue}>{displayId}</Text>
-            </Text>
-          </View>
-
-          {/* 🟢 STEP 1: Uploaded */}
-          <View style={styles.timelineItem}>
-            <View style={styles.activeCircle}>
-              <Ionicons name="checkmark" size={16} color={COLORS.white} />
-            </View>
-            <Text style={styles.stepText}>{STRINGS.status.stepUploaded}</Text>
-          </View>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>What happens next?</Text>
           
-          <View style={[styles.connector, isAiDone && styles.activeConnector]} />
-
-          {/* 🟡 STEP 2: AI Processing */}
-          <View style={styles.timelineItem}>
-            <View style={isAiDone ? styles.activeCircle : styles.inactiveCircle}>
-              {isAiDone ? (
-                <Ionicons name="checkmark" size={16} color={COLORS.white} />
-              ) : (
-                <ActivityIndicator size="small" color={COLORS.primary} />
-              )}
-            </View>
-            <Text style={[styles.stepText, !isAiDone && styles.dimText]}>
-              {STRINGS.status.stepAi}
+          <View style={styles.infoRow}>
+            <View style={styles.bullet} />
+            <Text style={styles.infoText}>
+              Our AI is currently organizing your medical data for the specialist.
             </Text>
           </View>
 
-          <View style={[styles.connector, isDoctorDone && styles.activeConnector]} />
-
-          {/* 🔵 STEP 3: Specialist Review */}
-          <View style={styles.timelineItem}>
-            <View style={isDoctorDone ? styles.activeCircle : styles.inactiveCircle}>
-              {isDoctorDone ? (
-                <Ionicons name="checkmark" size={16} color={COLORS.white} />
-              ) : (
-                <View style={styles.pulseDot} />
-              )}
-            </View>
-            <Text style={[styles.stepText, !isDoctorDone && styles.dimText]}>
-              {STRINGS.status.stepDoctor}
+          <View style={styles.infoRow}>
+            <View style={styles.bullet} />
+            <Text style={styles.infoText}>
+              A medical specialist will review the findings and finalize your report.
             </Text>
           </View>
 
-          <View style={styles.infoBox}>
-            <Ionicons 
-              name={isDoctorDone ? "checkmark-circle" : "time-outline"} 
-              size={18} 
-              color={isDoctorDone ? "#10B981" : COLORS.secondary} 
-            />
-            <Text style={[styles.estimateText, isDoctorDone && { color: "#10B981" }]}>
-                {isDoctorDone ? "Review Complete" : "Specialist is reviewing your data"}
+          <View style={styles.infoRow}>
+            <View style={styles.bullet} />
+            <Text style={styles.infoText}>
+              <Text style={{ fontWeight: 'bold' }}>You will receive a notification</Text> once your case review is ready.
             </Text>
           </View>
 
+          <View style={styles.noticeBox}>
+            <Text style={styles.noticeText}>
+              You may close the app now. We'll alert you the moment your results are available.
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.actionContainer}>
           <PrimaryButton 
-            title={STRINGS.status.caseSummary} 
+            title={isProcessComplete ? "View Case Summary" : "Waiting for Specialist..."} 
             disabled={!isProcessComplete} 
             onPress={() => {
               router.push({
@@ -177,85 +126,47 @@ export default function CaseStatus() {
               } as any);
             }}
             style={{ 
-              marginTop: 10,
-              opacity: !isProcessComplete ? 0.6 : 1,
+              opacity: !isProcessComplete ? 0.5 : 1,
               backgroundColor: isProcessComplete ? COLORS.primary : COLORS.border
             }} 
           />
+          
+          <TouchableOpacity style={styles.homeLink} onPress={() => router.replace('/(tabs)/patient/patienthome')}>
+            <Text style={styles.homeLinkText}>Return to Home</Text>
+          </TouchableOpacity>
         </View>
-
-        <TouchableOpacity style={styles.supportLink} onPress={() => fetchStatus()}>
-          <Ionicons name="refresh-outline" size={16} color={COLORS.primary} />
-          <Text style={styles.supportText}>Tap to check manually</Text>
-        </TouchableOpacity>
       </ScrollView>
     </AuthLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', marginTop: 100 },
-  loadingText: { ...TYPOGRAPHY.body, color: COLORS.textSub, marginTop: 10 },
-  scrollContent: { paddingBottom: 120, paddingTop: 20 },
-  headerSection: { alignItems: 'center', marginBottom: 25 },
-  appName: { ...TYPOGRAPHY.brand, fontSize: 20, color: COLORS.primary, marginBottom: 5 },
-  title: { ...TYPOGRAPHY.header, color: COLORS.textMain, marginBottom: 8 },
-  subtitle: { ...TYPOGRAPHY.body, color: COLORS.textSub, textAlign: 'center', paddingHorizontal: 40, fontSize: 13 },
-  glassCard: {
+  loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  scrollContent: { padding: 20, paddingBottom: 100 },
+  headerSection: { alignItems: 'center', marginVertical: 30 },
+  title: { ...TYPOGRAPHY.header, fontSize: 24, marginTop: 15, color: COLORS.textMain },
+  caseIdText: { ...TYPOGRAPHY.body, color: COLORS.textSub, marginTop: 5 },
+  infoCard: {
     backgroundColor: COLORS.white,
     borderRadius: BORDER_RADIUS.card,
     padding: 24,
-    marginHorizontal: 15,
-    ...SHADOWS.soft
+    ...SHADOWS.soft,
+    marginBottom: 30
   },
-  idBadge: {
-    backgroundColor: '#F1F5F9',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: 25,
-  },
-  caseLabel: { fontSize: 12, color: COLORS.textSub },
-  caseValue: { fontWeight: 'bold', color: COLORS.primary },
-  timelineItem: { flexDirection: 'row', alignItems: 'center' },
-  activeCircle: { 
-    width: 30, 
-    height: 30, 
-    borderRadius: 15, 
-    backgroundColor: COLORS.secondary, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: 15,
-  },
-  inactiveCircle: { 
-    width: 30, 
-    height: 30, 
-    borderRadius: 15, 
-    backgroundColor: '#F8FAFC', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginRight: 15, 
-    borderWidth: 1, 
-    borderColor: COLORS.border 
-  },
-  pulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#CBD5E1' },
-  stepText: { fontWeight: '700', fontSize: 14, color: COLORS.textMain, flex: 1 },
-  dimText: { fontWeight: '500', color: COLORS.textSub },
-  connector: { width: 2, height: 30, backgroundColor: COLORS.border, marginLeft: 14, marginVertical: -2 },
-  activeConnector: { backgroundColor: COLORS.secondary },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#F8FAFC',
-    padding: 12,
+  infoTitle: { ...TYPOGRAPHY.header, fontSize: 18, marginBottom: 20, color: COLORS.primary },
+  infoRow: { flexDirection: 'row', marginBottom: 15, alignItems: 'flex-start' },
+  bullet: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.secondary, marginTop: 6, marginRight: 12 },
+  infoText: { ...TYPOGRAPHY.body, flex: 1, color: COLORS.textMain, lineHeight: 20 },
+  noticeBox: {
+    backgroundColor: '#F0F9FF',
+    padding: 15,
     borderRadius: BORDER_RADIUS.md,
-    marginTop: 30,
-    marginBottom: 20,
+    marginTop: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.secondary
   },
-  estimateText: { fontWeight: '600', color: COLORS.textMain, fontSize: 12 },
-  supportLink: { marginTop: 25, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  supportText: { fontWeight: '600', color: COLORS.primary, fontSize: 13 }
+  noticeText: { ...TYPOGRAPHY.body, fontSize: 13, color: '#0369A1', fontStyle: 'italic' },
+  actionContainer: { gap: 15 },
+  homeLink: { alignSelf: 'center', marginTop: 10 },
+  homeLinkText: { color: COLORS.primary, fontWeight: '600', fontSize: 15 }
 });
