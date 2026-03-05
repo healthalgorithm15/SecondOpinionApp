@@ -92,7 +92,14 @@ export default function Signup() {
         });
       }
     } catch (error: any) {
-      setErrorMsg(error.response?.data?.message || "Registration failed. Please try again.");
+      const debugMessage = `
+    Err: ${error.message} 
+    URL: ${error.config?.url} 
+    Status: ${error.response?.status}
+  `;
+  setErrorMsg(debugMessage);
+  console.log("Full Error Object:", error);
+      //setErrorMsg(error.response?.data?.message || "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }

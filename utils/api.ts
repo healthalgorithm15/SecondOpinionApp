@@ -8,8 +8,8 @@ import { router } from 'expo-router';
  * For physical devices, use your computer's IP: http://192.168.x.x:5000/api
  */
 const API = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
-  timeout: 15000, // 15-second timeout for slow medical report uploads
+  baseURL: process.env.EXPO_PUBLIC_API_URL  || 'https://healthalgorithm-a5aqe6ckgzdmb0cf.southindia-01.azurewebsites.net/api',
+  timeout: 90000, // 15-second timeout for slow medical report uploads
 });
 
 /**
@@ -29,7 +29,9 @@ API.interceptors.request.use(
     if (config.data instanceof FormData) {
       // Axios usually sets this automatically, but deleting it 
       // ensures the browser/mobile environment sets the correct boundary
-      delete config.headers['Content-Type'];
+     // delete config.headers['Content-Type'];
+     config.headers['Content-Type'] = 'multipart/form-data';
+     config.transformRequest = [(data) => data];
     }
     
     return config;

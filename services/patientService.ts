@@ -8,7 +8,6 @@ import API from '../utils/api';
 export const patientService = {
   /**
    * Fetches the patient's current dashboard data.
-   * Hits GET /api/patient/dashboard
    */
   getDashboard: async () => {
     try {
@@ -21,9 +20,20 @@ export const patientService = {
   },
 
   /**
-   * 🚀 PRODUCTION REVIEW SUBMISSION
-   * Triggers the AI and specialist review pipeline for selected reports.
-   * Hits POST /api/patient/submit-review
+   * Deletes a specific medical record.
+   */
+  deleteRecord: async (id: string) => {
+    try {
+      const response = await API.delete(`/patient/record/${id}`);
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Delete Record Error:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * Triggers the AI and specialist review pipeline.
    */
   submitForReview: async (reportIds: string[]) => {
     try {
@@ -36,9 +46,7 @@ export const patientService = {
   },
 
   /**
-   * Handles multi-platform file uploads.
-   * Prepares specific FormData structures for Web vs Mobile.
-   * Hits POST /api/patient/upload
+   * Handles multi-platform file uploads with Android URI fixes.
    */
   uploadRecord: async (fileUri: string, fileName: string, mimeType: string) => {
     const formData = new FormData();
@@ -48,9 +56,12 @@ export const patientService = {
       const blob = await response.blob();
       formData.append('file', blob, fileName); 
     } else {
-      const cleanUri = Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri;
+      const uploadUri = Platform.OS === 'ios' 
+        ? fileUri.replace('file://', '') 
+        : fileUri;
+
       formData.append('file', {
-        uri: cleanUri,
+        uri: uploadUri,
         name: fileName || 'upload.pdf',
         type: mimeType || 'application/pdf',
       } as any);
@@ -64,18 +75,16 @@ export const patientService = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        transformRequest: (data) => data,
       });
       return response.data;
     } catch (error: any) {
-      console.error("❌ Upload Error Details:", error.response?.data || error.message);
+      const errorMsg = error.response?.data?.message || error.message;
+      console.error("❌ Upload Error Details:", errorMsg);
       throw error;
     }
   },
 
-  /**
-   * Fetches detailed case status (used for real-time tracking/polling).
-   * Hits GET /api/patient/case/:caseId
-   */
   getCaseStatus: async (caseId: string) => {
     try {
       const response = await API.get(`/patient/case/${caseId}`);
@@ -86,12 +95,6 @@ export const patientService = {
     }
   },
 
-  /**
-   * 🟢 UPDATED: Fetches paginated ReviewCase objects for the History screen.
-   * Hits GET /api/patient/history?page=1&limit=10
-   * @param page - The page number to fetch
-   * @param limit - Number of items per page
-   */
   getReviewHistory: async (page = 1, limit = 10) => {
     try {
       const response = await API.get('/patient/history', {

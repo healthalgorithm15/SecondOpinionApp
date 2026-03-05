@@ -7,17 +7,25 @@
     "icon": "./assets/images/icon.png",
     "scheme": "secondmedapp",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourname.pramanai"
+      "bundleIdentifier": "com.healthalgorithm.secondmedapp",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.yourname.pramanai",
+      "package": "com.healthalgorithm.secondmedapp",
+      "googleServicesFile": "./google-services.json",
+      "newArchEnabled":true,
+      "permissions": [
+        "NOTIFICATIONS",
+        "INTERNET",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/icon.png",
-        "permissions": ["READ_EXTERNAL_STORAGE", "WRITE_EXTERNAL_STORAGE"]
+        "foregroundImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true
     },
@@ -43,7 +51,18 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e81e2f1d-4edc-4b90-869d-b9e7d0edcb36"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e81e2f1d-4edc-4b90-869d-b9e7d0edcb36"
     }
-    
   }
 }

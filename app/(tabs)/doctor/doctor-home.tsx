@@ -5,27 +5,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native'; // 🟢 Added for screen focus detection
+import { useFocusEffect } from '@react-navigation/native';
 
-// Design System
+// --- DESIGN SYSTEM ---
 import AuthLayout from '../../../components/AuthLayout';
-import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
-import { STRINGS } from '../../../constants/Strings';
+import { COLORS, SHADOWS } from '../../../constants/theme';
 
-// Logic & Real-time
+// --- LOGIC ---
 import { doctorService } from '../../../services/doctorService';
-import { socketService } from '@/services/socketService';
-import { storage } from '@/utils/storage'; 
-
-/**
- * 🟢 Define the shape of the Socket Event Data
- */
-interface NewCasePayload {
-  caseId: string;
-  patientName: string;
-  riskLevel: 'Low' | 'Medium' | 'High';
-  summary: string;
-}
 
 export default function DoctorHomeScreen() {
   const router = useRouter();
@@ -50,10 +37,6 @@ export default function DoctorHomeScreen() {
     }
   }, []);
 
-  /**
-   * 🎯 FOCUS TRIGGER: This ensures the list updates when navigating back
-   * from the review screen. This solves the "case still showing as pending" issue.
-   */
   useFocusEffect(
     useCallback(() => {
       fetchWorklist();
@@ -61,96 +44,99 @@ export default function DoctorHomeScreen() {
   );
 
   /**
-   * ⚡ Real-time Socket Listener & Initialization
+   * 👁️ Handle Viewing specific attachments
    */
-  useEffect(() => {
-    const initializeSocket = async () => {
-      const userId = await storage.getItem('userId');
-      
-      if (userId) {
-        socketService.connect();
-        socketService.joinRoom({ 
-          userId: userId, 
-          role: 'doctor' 
-        });
-        console.log("🔗 Socket connected and linked for User:", userId);
+  const handleViewFile = (record: any, patientName: string) => {
+    const isObject = typeof record === 'object' && record !== null;
+    const recordId = isObject ? record._id : record;
+    
+    // Improved detection logic
+    let contentType = isObject ? record.contentType : 'application/pdf';
+    
+    // If we only have an ID string, we can't be 100% sure of the type, 
+    // but DocumentViewScreen's new isPDF check will help.
+    
+    if (!recordId) {
+      Alert.alert("Error", "Medical record ID is missing.");
+      return;
+    }
+
+    router.push({
+      pathname: '/view/DocumentViewScreen', 
+      params: { 
+        docId: recordId, 
+        fileName: `${patientName}'s Record` || 'Medical Record',
+        contentType: contentType,
+        role: 'doctor' 
       }
-    };
-
-    initializeSocket();
-
-    // Listen for "newCase" emitted by the backend
-    socketService.on('newCase', (data: NewCasePayload) => {
-      console.log("🚨 New Case Received via Socket:", data);
-      fetchWorklist();
-
-      Alert.alert(
-        "🚨 New Case Assigned",
-        `Patient ${data.patientName} requires a ${data.riskLevel} priority review.`,
-        [
-          { text: "Dismiss", style: "cancel" },
-          { 
-            text: "View Now", 
-            onPress: () => router.push({
-              pathname: '/(tabs)/doctor-review/[caseId]',
-              params: { caseId: data.caseId }
-            } as any)
-          }
-        ]
-      );
-    });
-
-    return () => {
-      socketService.off('newCase');
-    };
-  }, [fetchWorklist]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchWorklist();
+    } as any);
   };
 
   /**
-   * 🎨 Render Individual Case Card
+   * 🎨 Render Case Card
    */
   const renderCaseItem = ({ item }: { item: any }) => {
     const isUrgent = item.aiAnalysis?.riskLevel === 'High';
-    
+    const accentColor = isUrgent ? '#EF4444' : '#1E7D75';
+
     return (
-      <TouchableOpacity 
-        style={styles.caseCard}
-        activeOpacity={0.8}
-        onPress={() => router.push({
-          pathname: '/(tabs)/doctor-review/[caseId]',
-          params: { caseId: item._id }
-        } as any)}
-      >
-        <View style={styles.cardLeft}>
-          <View style={[styles.iconBox, { backgroundColor: isUrgent ? '#FEE2E2' : '#E0F2FE' }]}>
-            <Ionicons 
-              name={item.type === 'ECG' ? 'heart' : 'document-text'} 
-              size={20} 
-              color={isUrgent ? '#EF4444' : COLORS.secondary} 
-            />
-          </View>
-          <View style={styles.infoColumn}>
-            <Text style={styles.caseId}>Case #{item._id.slice(-6).toUpperCase()}</Text>
-            <Text style={styles.patientName}>{item.patientId?.name || 'Anonymous Patient'}</Text>
-          </View>
-        </View>
+      <View style={styles.caseCard}>
+        {/* Left Status Strip */}
+        <View style={[styles.urgencyStrip, { backgroundColor: accentColor }]} />
         
-        <View style={[
-          styles.badge, 
-          { backgroundColor: isUrgent ? '#FEE2E2' : '#F1F5F9' }
-        ]}>
-          <Text style={[
-            styles.badgeText, 
-            { color: isUrgent ? '#B91C1C' : '#475569' }
-          ]}>
-            {isUrgent ? 'Urgent' : 'Pending'}
-          </Text>
+        <View style={styles.cardBody}>
+          {/* LEFT SECTION: Patient Details */}
+          <View style={styles.infoSection}>
+            <Text style={styles.caseId}>CASE #{item._id.slice(-6).toUpperCase()}</Text>
+            <Text style={styles.patientName} numberOfLines={1}>
+              {item.patientId?.name || 'Anonymous Patient'}
+            </Text>
+            <View style={[styles.typeBadge, { borderColor: accentColor + '30' }]}>
+              <Text style={[styles.typeText, { color: accentColor }]}>
+                {isUrgent ? 'PRIORITY REVIEW' : 'ROUTINE CHECK'}
+              </Text>
+            </View>
+          </View>
+
+          {/* RIGHT SECTION: Multi-Attachments & Review Button */}
+          <View style={styles.actionSection}>
+            <View style={styles.attachmentGrid}>
+              {item.recordIds?.map((record: any, index: number) => {
+                // Determine icon based on contentType
+                const isPdf = (typeof record === 'object' ? record.contentType : '').includes('pdf');
+                
+                return (
+                  <TouchableOpacity 
+                    key={index}
+                    style={styles.attachmentIcon}
+                    onPress={() => handleViewFile(record, item.patientId?.name)}
+                  >
+                    <Ionicons 
+                      name={isPdf ? "document-text" : "image"} 
+                      size={18} 
+                      color={COLORS.primary} 
+                    />
+                    <View style={styles.countBadge}>
+                       <Text style={styles.countText}>{index + 1}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.reviewBtn, { backgroundColor: accentColor }]} 
+              onPress={() => router.push({
+                pathname: '/(tabs)/doctor-review/[caseId]',
+                params: { caseId: item._id }
+              } as any)}
+            >
+              <Text style={styles.reviewBtnText}>Review</Text>
+              <Ionicons name="chevron-forward" size={14} color="#FFF" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -159,40 +145,33 @@ export default function DoctorHomeScreen() {
       <AuthLayout>
         <View style={styles.mainContainer}>
           <View style={styles.headerInfo}>
-            <Text style={styles.welcome}>{STRINGS.doctor.portal}</Text>
+            <Text style={styles.welcome}>Worklist</Text>
             <Text style={styles.subtitle}>
-              {loading ? 'Updating queue...' : STRINGS.doctor.caseStats(cases.length)}
+              {loading ? 'Updating...' : `${cases.length} pending assignments`}
             </Text>
           </View>
 
-          <View style={styles.glassCard}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{STRINGS.doctor.assignedCases}</Text>
-              {loading && <ActivityIndicator size="small" color={COLORS.secondary} />}
-            </View>
-            
-            <FlatList
-              data={cases}
-              renderItem={renderCaseItem}
-              keyExtractor={(item) => item._id}
-              scrollEnabled={true} 
-              ListEmptyComponent={
-                !loading ? (
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="cafe-outline" size={48} color={COLORS.border} />
-                    <Text style={styles.emptyText}>All caught up! No pending cases.</Text>
-                  </View>
-                ) : null
-              }
-              refreshControl={
-                <RefreshControl 
-                  refreshing={refreshing} 
-                  onRefresh={onRefresh} 
-                  tintColor={COLORS.secondary} 
-                />
-              }
-            />
-          </View>
+          <FlatList
+            data={cases}
+            renderItem={renderCaseItem}
+            keyExtractor={(item) => item._id}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              !loading ? (
+                <View style={styles.emptyContainer}>
+                  <Ionicons name="cafe-outline" size={48} color="#CBD5E1" />
+                  <Text style={styles.emptyText}>All caught up!</Text>
+                </View>
+              ) : null
+            }
+            refreshControl={
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={fetchWorklist} 
+                tintColor="#1E7D75" 
+              />
+            }
+          />
         </View>
       </AuthLayout>
     </View>
@@ -200,69 +179,84 @@ export default function DoctorHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  screenWrapper: { flex: 1, backgroundColor: COLORS.bgScreen },
-  mainContainer: { width: '100%', alignItems: 'center', paddingTop: 10 },
+  screenWrapper: { flex: 1, backgroundColor: '#F8FAFC' },
+  mainContainer: { flex: 1, width: '100%' },
   headerInfo: { alignItems: 'center', marginBottom: 20 },
-  welcome: { ...TYPOGRAPHY.header, color: COLORS.primary },
-  subtitle: { ...TYPOGRAPHY.body, color: COLORS.textSub, marginTop: 4 },
-  
-  glassCard: {
-    width: '94%', 
-    backgroundColor: COLORS.glassBg, 
-    borderRadius: BORDER_RADIUS.card,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.glassBorder,
-    marginBottom: 100, 
-    minHeight: 300,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-    paddingHorizontal: 4,
-  },
-  sectionTitle: { 
-    fontFamily: 'Inter-Bold',
-    fontSize: 16, 
-    color: COLORS.textMain, 
-  },
+  welcome: { fontSize: 24, fontWeight: '800', color: '#1E293B' },
+  subtitle: { fontSize: 14, color: '#64748B' },
+  listContainer: { paddingHorizontal: 16, paddingBottom: 100 },
+
   caseCard: { 
-    backgroundColor: COLORS.white, 
-    padding: 14, 
-    borderRadius: BORDER_RADIUS.inner, 
+    backgroundColor: '#FFF', 
+    borderRadius: 16, 
     marginBottom: 12, 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4
+    flexDirection: 'row',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    ...SHADOWS.soft
   },
-  cardLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+  urgencyStrip: { width: 5 },
+  cardBody: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    padding: 12, 
+    alignItems: 'center', 
+    justifyContent: 'space-between' 
+  },
+
+  infoSection: { flex: 0.55 }, // Limits text area width to prevent overlap
+  caseId: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
+  patientName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginVertical: 2 },
+  typeBadge: { 
+    alignSelf: 'flex-start',
+    paddingHorizontal: 6, paddingVertical: 2, 
+    borderRadius: 4, borderWidth: 1, marginTop: 4 
+  },
+  typeText: { fontSize: 8, fontWeight: '900' },
+
+  actionSection: { flex: 0.45, alignItems: 'flex-end' }, // Groups icons and button on the right
+  attachmentGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'flex-end',
+    marginBottom: 8 
+  },
+  attachmentIcon: {
+    width: 36,
+    height: 36,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginLeft: 6,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    position: 'relative'
   },
-  infoColumn: { flex: 1 },
-  caseId: { fontFamily: 'Inter-Bold', fontSize: 14, color: COLORS.textMain },
-  patientName: { fontFamily: 'Inter-Medium', fontSize: 12, color: COLORS.textSub, marginTop: 1 },
-  
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  badgeText: { fontFamily: 'Inter-Bold', fontSize: 10 },
-  
-  emptyContainer: { alignItems: 'center', paddingVertical: 40 },
-  emptyText: { 
-    fontFamily: 'Inter-Medium', 
-    color: COLORS.textSub, 
-    marginTop: 10,
-    fontSize: 14 
-  }
+  countBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#1E7D75',
+    borderRadius: 7,
+    width: 14,
+    height: 14,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  countText: { color: 'white', fontSize: 8, fontWeight: 'bold' },
+
+  reviewBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 12, 
+    paddingVertical: 8, 
+    borderRadius: 8 
+  },
+  reviewBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13, marginRight: 4 },
+
+  emptyContainer: { alignItems: 'center', marginTop: 60 },
+  emptyText: { color: '#64748B', marginTop: 10, fontSize: 14 }
 });

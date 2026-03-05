@@ -12,6 +12,7 @@ export const authService = {
       password: password
     };
     try {
+
       const response = await API.post('/auth/register', payload);
       return response.data;
     } catch (error: any) {

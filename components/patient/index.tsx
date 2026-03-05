@@ -55,13 +55,15 @@ export const PatientExistingUI = ({
   name, 
   onContinue, 
   onUploadPDF, 
-  onScanPhoto 
+  onScanPhoto,
+  onDeleteReport
 }: { 
   reports: any[]; 
   name: string; 
   onContinue: () => void; 
   onUploadPDF: () => void; 
   onScanPhoto: () => void; 
+  onDeleteReport: (id: string) => void;
 }) => (
   <BackgroundLayout>
     <View style={styles.topHeader}><Text style={styles.brandTitle}>{STRINGS.common.appName}</Text></View>
@@ -71,6 +73,7 @@ export const PatientExistingUI = ({
         reports={reports} 
         onContinue={onContinue} 
         onAddMore={onUploadPDF} 
+        onDeleteReport={onDeleteReport}
       />
     </ScrollView>
   </BackgroundLayout>

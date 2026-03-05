@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as WebBrowser from 'expo-web-browser';
 
 // --- DESIGN SYSTEM ---
 import AuthLayout from '../../../components/AuthLayout';
@@ -34,7 +33,7 @@ export default function DoctorReviewDetail() {
   const [summary, setSummary] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 🟢 Unified Modal State
+  // Unified Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     title: '',
@@ -43,7 +42,6 @@ export default function DoctorReviewDetail() {
     onConfirm: () => {}
   });
 
-  // Animation State
   const scaleValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -58,7 +56,6 @@ export default function DoctorReviewDetail() {
     }
   }, [modalVisible]);
 
-  // Helper to trigger our custom Modal instead of Alert
   const showAppAlert = (title: string, message: string, type: 'success' | 'error' = 'error', onConfirm?: () => void) => {
     setModalConfig({
       title,
@@ -76,9 +73,10 @@ export default function DoctorReviewDetail() {
         const res = await doctorService.getCaseDetails(id as string); 
         if (res.success) {
           setCaseData(res.data);
-          if (res.data.clinicalVerdict) {
-            setDiagnosis(res.data.clinicalVerdict.diagnosis || '');
-            setSummary(res.data.clinicalVerdict.notes || '');
+          // If already has doctor findings (history view)
+          if (res.data.doctorOpinion) {
+            setDiagnosis(res.data.doctorOpinion.finalVerdict || '');
+            setSummary(res.data.doctorOpinion.recommendations || '');
           }
         }
       } catch (error) {
@@ -90,12 +88,27 @@ export default function DoctorReviewDetail() {
     fetchDetail();
   }, [caseId]);
 
-  const handleViewFile = async () => {
-    const recordId = caseData?.recordId?._id || caseData?.recordId;
-    if (!recordId) return showAppAlert(STRINGS.common.appName, "No medical file associated with this case.");
-    
-    const url = `${process.env.EXPO_PUBLIC_API_URL}/api/patient/record/view/${recordId}`;
-    await WebBrowser.openBrowserAsync(url);
+  /**
+   * 👁️ Updated: Handle Viewing individual attachments internally
+   */
+  const handleViewSpecificFile = (record: any) => {
+    const recordId = record?._id || record;
+    const contentType = record?.contentType || 'application/pdf';
+
+    if (!recordId) {
+      return showAppAlert(STRINGS.common.appName, "No medical record ID found.");
+    }
+
+    // Navigating to the shared DocumentViewScreen
+    router.push({
+      pathname: '/view/DocumentViewScreen', 
+      params: { 
+        docId: recordId, 
+        fileName: caseData?.patientId?.name || 'Medical Record',
+        contentType: contentType, // 🚀 Prevents the "Corrupted" error
+        role: 'doctor' 
+      }
+    } as any);
   };
 
   const handleSubmit = async () => {
@@ -119,7 +132,7 @@ export default function DoctorReviewDetail() {
         );
       }
     } catch (error) {
-      showAppAlert(STRINGS.common.appName, "Failed to submit review. Please check your connection.");
+      showAppAlert(STRINGS.common.appName, "Failed to submit review.");
     } finally {
       setIsSubmitting(false);
     }
@@ -136,20 +149,47 @@ export default function DoctorReviewDetail() {
 
   return (
     <AuthLayout 
-      title={`${STRINGS.status.caseSummary}: ${caseId?.toString().slice(-6).toUpperCase()}`}
+      title={`Review: ${caseId?.toString().slice(-6).toUpperCase()}`}
       subtitle={caseData?.patientId?.name}
     >
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}
       >
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
           
-          <TouchableOpacity style={styles.fileButton} onPress={handleViewFile}>
-            <Ionicons name="document-attach-outline" size={20} color={COLORS.primary} />
-            <Text style={styles.fileButtonText}>{STRINGS.common.viewReport}</Text>
-          </TouchableOpacity>
+          {/* 📎 ATTACHMENTS LIST */}
+          <View style={styles.attachmentSection}>
+            <Text style={styles.sectionLabel}>PATIENT ATTACHMENTS</Text>
+            {caseData?.recordIds && caseData.recordIds.length > 0 ? (
+              caseData.recordIds.map((record: any, index: number) => (
+                <TouchableOpacity 
+                  key={record._id || index} 
+                  style={styles.fileButton} 
+                  onPress={() => handleViewSpecificFile(record)}
+                >
+                  <Ionicons 
+                    name={record.contentType?.includes('pdf') ? "document-text" : "image"} 
+                    size={20} 
+                    color={COLORS.primary} 
+                  />
+                  <View style={styles.fileButtonTextContainer}>
+                    <Text style={styles.fileButtonText}>
+                      View Attachment {caseData.recordIds.length > 1 ? `#${index + 1}` : ''}
+                    </Text>
+                    <Text style={styles.fileTypeText}>
+                      {record.contentType?.includes('pdf') ? 'PDF Document' : 'Image File'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={COLORS.primary} opacity={0.5} />
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noFilesText}>No attachments found for this case.</Text>
+            )}
+          </View>
 
+          {/* AI INSIGHTS CARD */}
           <View style={styles.glassCard}>
             <View style={styles.sectionHeader}>
               <Ionicons name="analytics-outline" size={18} color={COLORS.primary} />
@@ -169,6 +209,7 @@ export default function DoctorReviewDetail() {
             </View>
           </View>
 
+          {/* DOCTOR INPUTS */}
           <View style={styles.inputSection}>
             <Text style={[TYPOGRAPHY.boldText, styles.label]}>{STRINGS.doctor.diagnosisLabel}</Text>
             <TextInput
@@ -202,11 +243,10 @@ export default function DoctorReviewDetail() {
               <Text style={styles.cancelText}>{STRINGS.common.cancel}</Text>
             </TouchableOpacity>
           </View>
-          <View style={{ height: 50 }} />
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* 🟢 DYNAMIC APP MODAL (Replaces all Alerts) */}
+      {/* DYNAMIC APP MODAL */}
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <Animated.View style={[styles.modalContent, { transform: [{ scale: scaleValue }] }]}>
@@ -238,18 +278,26 @@ export default function DoctorReviewDetail() {
 
 const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bgScreen },
+  
+  attachmentSection: { marginBottom: 20 },
+  sectionLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1.5, marginBottom: 10 },
   fileButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(30, 93, 87, 0.08)',
-    padding: 12,
+    backgroundColor: '#FFF',
+    padding: 14,
     borderRadius: BORDER_RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(30, 93, 87, 0.2)',
-    marginBottom: 20
+    borderColor: '#E2E8F0',
+    marginBottom: 10,
+    ...SHADOWS.soft
+    
   },
-  fileButtonText: { color: COLORS.primary, fontFamily: 'Inter-SemiBold', marginLeft: 8 },
+  fileButtonTextContainer: { flex: 1, marginLeft: 12 },
+  fileButtonText: { color: COLORS.primary, fontSize: 14, fontWeight: '700' },
+  fileTypeText: { color: '#64748B', fontSize: 11, marginTop: 2 },
+  noFilesText: { color: '#94A3B8', fontStyle: 'italic', textAlign: 'center', padding: 10 },
+
   glassCard: {
     backgroundColor: COLORS.glassBg,
     borderRadius: BORDER_RADIUS.card,
@@ -264,6 +312,7 @@ const styles = StyleSheet.create({
   markerList: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 15 },
   markerChip: { backgroundColor: 'rgba(30, 93, 87, 0.1)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, marginRight: 8, marginBottom: 8 },
   markerText: { fontSize: 12, color: COLORS.primary, fontWeight: '600' },
+  
   inputSection: { marginTop: 25 },
   label: { color: COLORS.primary, fontSize: 11, marginBottom: 8, letterSpacing: 1 },
   input: { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.md, padding: 15, borderWidth: 1, borderColor: COLORS.border, marginBottom: 20 },
@@ -271,7 +320,6 @@ const styles = StyleSheet.create({
   cancelLink: { marginTop: 15, alignItems: 'center' },
   cancelText: { color: COLORS.textSub, fontSize: 14 },
 
-  // MODAL STYLES
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: 'white', borderRadius: 24, padding: 25, alignItems: 'center', ...SHADOWS.soft },
   iconCircle: { width: 70, height: 70, borderRadius: 35, justifyContent: 'center', alignItems: 'center', marginBottom: 20 },

@@ -42,16 +42,29 @@ export default function RootLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      {/* Main Entry & Auth Flow */}
       <Stack.Screen name="index" /> 
       <Stack.Screen name="auth/login" />
       <Stack.Screen name="auth/signup" />
       <Stack.Screen name="auth/otp" />
       <Stack.Screen name="auth/doctor-activation" /> 
+      
+      {/* Main App Tabs */}
       <Stack.Screen 
         name="(tabs)" 
         options={{ 
           animation: 'fade',
           gestureEnabled: false 
+        }} 
+      />
+
+      {/* 🚀 Document Viewer (Correctly placed as a sibling) */}
+      <Stack.Screen 
+        name="view/DocumentViewScreen" 
+        options={{ 
+          presentation: 'modal', // Slides up from bottom
+          headerShown: false,    // Using your custom header
+          title: 'Document Viewer'
         }} 
       />
     </Stack>
