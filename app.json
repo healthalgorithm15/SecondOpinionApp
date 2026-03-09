@@ -15,7 +15,7 @@
     "android": {
       "package": "com.healthalgorithm.secondmedapp",
       "googleServicesFile": "./google-services.json",
-      "newArchEnabled":true,
+      "newArchEnabled": true,
       "permissions": [
         "NOTIFICATIONS",
         "INTERNET",
@@ -27,7 +27,8 @@
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/icon.png"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro",
@@ -46,7 +47,23 @@
         }
       ],
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "extraProguardRules": "-keep public class com.horcrux.svg.** { *; } -keep class com.facebook.react.bridge.NativeModule { *; }",
+            "packagingOptions": {
+              "pickFirst": [
+                "**/libjsc.so",
+                "**/libc++_shared.so"
+              ]
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

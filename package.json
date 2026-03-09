@@ -21,6 +21,7 @@
     "axios": "^1.13.4",
     "expo": "~54.0.33",
     "expo-blur": "~15.0.8",
+    "expo-build-properties": "~1.0.10",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.20",
     "expo-device": "~8.0.10",
@@ -58,6 +59,7 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@expo/image-utils": "^0.8.12",
     "@types/react": "~19.1.0",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",

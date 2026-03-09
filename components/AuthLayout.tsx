@@ -21,7 +21,7 @@ export default function AuthLayout({
   return (
     <View style={styles.container}>
       <ImageBackground 
-        source={require('../assets/images/medical-bg.png')} 
+        source={require('../assets/images/medical-bg.webp')} 
         style={styles.background}
         resizeMode="cover" 
       >

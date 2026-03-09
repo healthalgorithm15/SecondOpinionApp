@@ -62,7 +62,7 @@ useEffect(() => {
       <StatusBar translucent backgroundColor="transparent" barStyle="dark-content" />
       
       <Image 
-        source={require('../assets/images/medical-bg.png')} 
+        source={require('../assets/images/medical-bg.webp')} 
         style={[styles.backgroundImage, { opacity: isLoaded ? 1 : 0 }]}
         onLoad={() => setIsLoaded(true)}
         resizeMode="cover" 
