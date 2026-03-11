@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+
 import { Stack } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
-import { storage } from '../utils/storage'; 
-import { COLORS } from '../constants/theme';
+
+import * as Notifications from 'expo-notifications';
 import { 
   useFonts, 
   Inter_400Regular, 
@@ -12,11 +13,13 @@ import {
   Inter_700Bold 
 } from '@expo-google-fonts/inter';
 
+// Prevent the splash screen from hiding until fonts and notification logic are ready
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
 
+  // 1. Load Custom Fonts
   const [fontsLoaded, fontError] = useFonts({
     'Inter-Regular': Inter_400Regular,
     'Inter-Medium': Inter_500Medium,
@@ -24,14 +27,34 @@ export default function RootLayout() {
     'Inter-Bold': Inter_700Bold,
   });
 
+  // 2. Initialize Native-Only Services (Notifications)
   useEffect(() => {
-    // Only hide splash screen and show the app once fonts are ready
+    if (Platform.OS !== 'web') {
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,      // Legacy support
+          shouldPlaySound: true,
+          shouldSetBadge: false,
+          // ✅ FIX for ts(2322): Modern Expo SDK requirements
+          shouldShowBanner: true, 
+          shouldShowList: true,
+        }),
+      });
+    }
+  }, []);
+
+  // 3. Final Readiness Check
+  useEffect(() => {
     if (fontsLoaded || fontError) {
       setIsReady(true);
-      SplashScreen.hideAsync();
+      // Small delay ensures smooth transition from splash to app
+      setTimeout(async () => {
+        await SplashScreen.hideAsync();
+      }, 100);
     }
   }, [fontsLoaded, fontError]);
 
+  // Loading State (while fonts are mounting)
   if (!isReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
@@ -42,14 +65,14 @@ export default function RootLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      {/* Main Entry & Auth Flow */}
+      {/* --- Auth & Entry Flow --- */}
       <Stack.Screen name="index" /> 
       <Stack.Screen name="auth/login" />
       <Stack.Screen name="auth/signup" />
       <Stack.Screen name="auth/otp" />
       <Stack.Screen name="auth/doctor-activation" /> 
       
-      {/* Main App Tabs */}
+      {/* --- Main Application Tabs --- */}
       <Stack.Screen 
         name="(tabs)" 
         options={{ 
@@ -58,13 +81,13 @@ export default function RootLayout() {
         }} 
       />
 
-      {/* 🚀 Document Viewer (Correctly placed as a sibling) */}
+      {/* --- Global Modals & Utilities --- */}
       <Stack.Screen 
         name="view/DocumentViewScreen" 
         options={{ 
-          presentation: 'modal', // Slides up from bottom
-          headerShown: false,    // Using your custom header
-          title: 'Document Viewer'
+          presentation: 'modal', 
+          headerShown: false,
+          // This allows the document viewer to slide up like a sheet on iOS
         }} 
       />
     </Stack>

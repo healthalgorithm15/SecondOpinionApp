@@ -8,6 +8,7 @@ import API from '../utils/api';
 export const patientService = {
   /**
    * Fetches the patient's current dashboard data.
+   * Scenario 2 (Drafts) and Scenario 3 (Active Cases) are handled here.
    */
   getDashboard: async () => {
     try {
@@ -21,6 +22,7 @@ export const patientService = {
 
   /**
    * Deletes a specific medical record.
+   * Note: Backend only allows deletion if isSubmitted is false.
    */
   deleteRecord: async (id: string) => {
     try {
@@ -34,6 +36,7 @@ export const patientService = {
 
   /**
    * Triggers the AI and specialist review pipeline.
+   * Transitions records from Scenario 2 to Scenario 3.
    */
   submitForReview: async (reportIds: string[]) => {
     try {
@@ -43,6 +46,30 @@ export const patientService = {
       console.error("❌ Submit Review Error:", error.response?.data || error.message);
       throw error;
     }
+  },
+
+  /**
+   * 🟢 REUSES an existing record from history.
+   * Adds a pointer/copy of a historical document to the current dashboard drafts.
+   */
+  reuseRecord: async (reportId: string) => {
+    try {
+      const response = await API.post('/patient/records/reuse', { reportId });
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Reuse Record Error:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 📄 GET SECURE DOWNLOAD URL
+   * Returns the full endpoint path for downloading a PDF.
+   * Used by Expo-File-System to download the file before viewing.
+   */
+  getRecordFileUrl: (recordId: string) => {
+    // This uses your existing axios base URL configuration
+    return `${API.defaults.baseURL}/patient/record/${recordId}/file`;
   },
 
   /**
@@ -85,6 +112,9 @@ export const patientService = {
     }
   },
 
+  /**
+   * Polling/Fetching endpoint for Scenario 3 (Active Stepper Status).
+   */
   getCaseStatus: async (caseId: string) => {
     try {
       const response = await API.get(`/patient/case/${caseId}`);
@@ -95,6 +125,9 @@ export const patientService = {
     }
   },
 
+  /**
+   * Fetches all past cases (Medical Vault / History Modal).
+   */
   getReviewHistory: async (page = 1, limit = 10) => {
     try {
       const response = await API.get('/patient/history', {

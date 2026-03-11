@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from 'react'; // 🟢 Added useCallback
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native'; // 🟢 Added for auto-refresh
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // 🟢 Added Icons
+import { useFocusEffect } from '@react-navigation/native';
 import AuthLayout from '../../../components/AuthLayout';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
 import { patientService } from '../../../services/patientService';
@@ -10,18 +10,13 @@ import { patientService } from '../../../services/patientService';
 export default function PatientHistory() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [reusingId, setReusingId] = useState<string | null>(null); // 🟢 Track specific reuse loading state
   const [completedCases, setCompletedCases] = useState<any[]>([]);
 
-  /**
-   * 🔄 Fetch History Logic
-   */
   const loadHistory = useCallback(async () => {
     try {
       const res = await patientService.getReviewHistory(); 
-      console.log("History screen data fetched:", res);
-      
       if (res.success && Array.isArray(res.data)) {
-        // Filter only cases that are marked as COMPLETED
         const finalized = res.data.filter((c: any) => 
           c.status?.toString().trim().toUpperCase() === "COMPLETED"
         );
@@ -35,9 +30,31 @@ export default function PatientHistory() {
   }, []);
 
   /**
-   * 🎯 FOCUS TRIGGER: This ensures the list updates every time the 
-   * patient returns to this screen from a case summary.
+   * 🟢 REUSE LOGIC
+   * Sends the record back to the current drafts workspace
    */
+  const handleReuse = async (reportId: string) => {
+    try {
+      setReusingId(reportId);
+      const res = await patientService.reuseRecord(reportId);
+      
+      if (res.success) {
+        Alert.alert(
+          "Added to Vault",
+          "This document has been added to your current drafts.",
+          [
+            { text: "View Drafts", onPress: () => router.push('/patient/patienthome') },
+            { text: "Keep Browsing", style: "cancel" }
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert("Error", "Could not reuse this document.");
+    } finally {
+      setReusingId(null);
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadHistory();
@@ -59,29 +76,47 @@ export default function PatientHistory() {
               nestedScrollEnabled={true}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
-                <TouchableOpacity 
-                  style={styles.card}
-                  onPress={() => router.push({
-                    pathname: "/patient/case-summary", 
-                    params: { caseId: item._id }
-                  })}
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-                    <Text style={styles.summary} numberOfLines={1}>
-                      {item.aiAnalysis?.summary || "Report Finalized"}
-                    </Text>
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{item.riskLevel || 'Review Complete'}</Text>
+                <View style={styles.cardContainer}>
+                  <TouchableOpacity 
+                    style={styles.card}
+                    onPress={() => router.push({
+                      pathname: "/patient/case-summary", 
+                      params: { caseId: item._id }
+                    })}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+                      <Text style={styles.summary} numberOfLines={1}>
+                        {item.aiAnalysis?.summary || "Report Finalized"}
+                      </Text>
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{item.riskLevel || 'Review Complete'}</Text>
+                      </View>
                     </View>
-                  </View>
-                  <Ionicons name="chevron-forward" size={20} color={COLORS.secondary} />
-                </TouchableOpacity>
+                    <Ionicons name="chevron-forward" size={20} color={COLORS.secondary} />
+                  </TouchableOpacity>
+
+                  {/* 🟢 REUSE ACTION BUTTON */}
+                  <TouchableOpacity 
+                    style={styles.reuseButton}
+                    onPress={() => handleReuse(item.recordIds[0]?._id || item.recordIds[0])}
+                    disabled={reusingId !== null}
+                  >
+                    {reusingId === (item.recordIds[0]?._id || item.recordIds[0]) ? (
+                      <ActivityIndicator size="small" color={COLORS.primary} />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="file-restore-outline" size={16} color={COLORS.primary} />
+                        <Text style={styles.reuseText}>Reuse Document</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               )}
               ListEmptyComponent={
                 <Text style={styles.empty}>No finalized medical reports found.</Text>
               }
-              contentContainerStyle={{ paddingBottom: 20 }}
+              contentContainerStyle={{ paddingBottom: 100 }}
             />
           </View>
         )}
@@ -90,23 +125,40 @@ export default function PatientHistory() {
   );
 }
 
-// ... styles remain the same
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 10 },
   title: { ...TYPOGRAPHY.header, color: COLORS.primary, marginBottom: 20 },
-  historyBox: { height: 550, width: '100%', overflow: 'hidden' },
-  card: { 
-    backgroundColor: 'white', 
-    padding: 16, 
-    borderRadius: BORDER_RADIUS.md, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 12,
-    elevation: 3, 
+  historyBox: { flex: 1, width: '100%' },
+  cardContainer: {
+    backgroundColor: 'white',
+    borderRadius: BORDER_RADIUS.md,
+    marginBottom: 16,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    overflow: 'hidden'
+  },
+  card: { 
+    padding: 16, 
+    flexDirection: 'row', 
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9'
+  },
+  reuseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#f8fafc',
+    gap: 6
+  },
+  reuseText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   date: { fontSize: 11, color: COLORS.textSub, marginBottom: 4 },
   summary: { ...TYPOGRAPHY.boldText, fontSize: 15, color: COLORS.textMain, marginBottom: 6 },

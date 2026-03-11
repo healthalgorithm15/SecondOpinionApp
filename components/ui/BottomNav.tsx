@@ -16,7 +16,10 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
           const isActive = tab.path === '' || tab.path === '/(tabs)'
             ? pathname === '/' || pathname === '/index'
             : pathname.includes(tab.path.replace('/(tabs)', ''));
-          
+
+          // Check if this is the primary action tab (Analyze)
+          const isAnalyzeTab = tab.name === 'Analyze';
+
           return (
             <TouchableOpacity 
               key={tab.name} 
@@ -24,18 +27,27 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
               activeOpacity={0.7}
               onPress={() => router.replace(tab.path as any)}
             >
-              <Ionicons 
-                name={isActive ? (tab.icon as any) : `${tab.icon}-outline`} 
-                size={24} 
-                color={isActive ? COLORS.secondary : COLORS.textSub} 
-              />
+              <View style={[
+                styles.iconContainer,
+                isAnalyzeTab && styles.analyzeIconContainer,
+                isAnalyzeTab && isActive && { backgroundColor: COLORS.secondary }
+              ]}>
+                <Ionicons 
+                  name={isActive ? (tab.icon as any) : `${tab.icon}-outline`} 
+                  size={isAnalyzeTab ? 28 : 24} 
+                  color={isActive ? (isAnalyzeTab ? COLORS.white : COLORS.secondary) : COLORS.textSub} 
+                />
+              </View>
+
               <Text style={[
                 styles.tabLabel, 
-                { color: isActive ? COLORS.secondary : COLORS.textSub }
+                { color: isActive ? COLORS.secondary : COLORS.textSub },
+                isAnalyzeTab && { fontWeight: '700' }
               ]}>
                 {tab.name}
               </Text>
-              {isActive && <View style={styles.activeIndicator} />}
+              
+              {isActive && !isAnalyzeTab && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           );
         })}
@@ -48,33 +60,54 @@ const styles = StyleSheet.create({
   container: {
     position: 'absolute',
     bottom: Platform.OS === 'ios' ? 30 : 20, 
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
     backgroundColor: 'transparent',
   },
   contentWrapper: {
     flexDirection: 'row',
     backgroundColor: COLORS.overlay,
-    borderRadius: 20, 
-    height: 70,
+    borderRadius: 24, 
+    height: 75,
     ...SHADOWS.soft,
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: 'rgba(255,255,255,0.6)',
   },
-  tabItem: { alignItems: 'center', flex: 1 },
+  tabItem: { 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    flex: 1,
+    height: '100%'
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  analyzeIconContainer: {
+    backgroundColor: 'rgba(30, 93, 87, 0.1)', // Light version of primary
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    marginBottom: 2,
+  },
   tabLabel: { 
     ...TYPOGRAPHY.caption, 
     fontSize: 10, 
-    marginTop: 2 
+    marginTop: 2,
+    textAlign: 'center'
   },
   activeIndicator: {
     width: 4,
     height: 4,
     borderRadius: 2,
     backgroundColor: COLORS.secondary,
-    marginTop: 4,
+    position: 'absolute',
+    bottom: 8,
   }
 });

@@ -186,7 +186,7 @@ export default function Signup() {
             </View>
 
             <TouchableOpacity style={styles.googleBtn} activeOpacity={0.7}>
-              <Image source={require('../../assets/images/google-icon.png')} style={styles.googleIcon} />
+              <Image source={require('../../assets/images/google-icon.webp')} style={styles.googleIcon} />
               <Text style={styles.googleText}>Continue with Google</Text>
             </TouchableOpacity>
           </View>

@@ -9,8 +9,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.healthalgorithm.secondmedapp",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "bundleIdentifier": "com.healthalgorithm.secondmedapp"
     },
     "android": {
       "package": "com.healthalgorithm.secondmedapp",
@@ -32,7 +31,7 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -54,7 +53,7 @@
           "android": {
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "-keep public class com.horcrux.svg.** { *; } -keep class com.facebook.react.bridge.NativeModule { *; }",
+            "extraProguardRules": "-keep public class com.horcrux.svg.** { *; }\n-keep class com.facebook.react.bridge.NativeModule { *; }\n-keepattributes *Annotation*\n-keepclassmembers class ** {\n    @org.webkit.JavascriptInterface <methods>;\n}\n-keep class com.razorpay.** {*;}\n-dontwarn com.razorpay.**",
             "packagingOptions": {
               "pickFirst": [
                 "**/libjsc.so",
@@ -75,9 +74,7 @@
         "projectId": "e81e2f1d-4edc-4b90-869d-b9e7d0edcb36"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/e81e2f1d-4edc-4b90-869d-b9e7d0edcb36"
     }

@@ -37,7 +37,7 @@ export default function DoctorActivationScreen() {
   }
 };
   return (
-    <ImageBackground source={require('@/assets/images/medical-bg.png')} style={styles.fullScreen}>
+    <ImageBackground source={require('@/assets/images/medical-bg.webp')} style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.formContainer}>
           <Text style={styles.title}>Activate Account</Text>

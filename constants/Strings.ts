@@ -18,24 +18,24 @@ export const STRINGS = {
     protectData: "This step helps protect your account and personal medical information.",
     securityNote: "Your medical information is encrypted and handled securely.",
     white: "#FFF",
-    securityDisclaimer: "Your information is protected using secure, medical-grade data handling practices.", //
+    securityDisclaimer: "Your information is protected using secure, medical-grade data handling practices.",
     viewReport: "View Original Report",
     viewPdf: "View PDF",
     submitting: "Submitting Verdict...",
     errorTitle: "Action Required",
   },
 
-welcome: {
-  title: "Praman AI",
-  tagline: "Get Clarity before Medical Decisions",
-  description: "Upload your medical reports. Our AI helps certified specialists review your case and provide expert, confidential second opinions.",
-  bullet1: "AI assists analysis",
-  bullet2: "Reviewed by licensed doctors",
-  bullet3: "Secure & private data",
-  getStarted: "Get Started",
-  login: "Login",
-  footerNote: "AI supports analysis. Final opinions are provided by licensed medical professionals"
-},
+  welcome: {
+    title: "Praman AI",
+    tagline: "Get Clarity before Medical Decisions",
+    description: "Upload your medical reports. Our AI helps certified specialists review your case and provide expert, confidential second opinions.",
+    bullet1: "AI assists analysis",
+    bullet2: "Reviewed by licensed doctors",
+    bullet3: "Secure & private data",
+    getStarted: "Get Started",
+    login: "Login",
+    footerNote: "AI supports analysis. Final opinions are provided by licensed medical professionals"
+  },
 
   auth: {
     createAccount: "Create your Account",
@@ -91,6 +91,56 @@ welcome: {
     gender: "Gender",
     history: "Medical History",
     healthboardTitle: "My Profile & Healthboard",
+    
+    // Landing Page Strings
+    landing: {
+      trustHeader: "Get Clarity before Medical Decisions",
+      trustSub: "Upload your medical reports. Our AI helps certified specialists review your case and provide expert, confidential second opinions.",
+      bullets: [
+        "AI assists analysis",
+        "Reviewed by licensed doctors",
+        "Secure & private data"
+      ],
+      servicesTitle: "Explore Our Services",
+      interpreterTitle: "Scan Interpreter",
+      interpreterSub: "Organize & Verify Scan Data",
+      paymentTitle: "Payment Guidance",
+      paymentSub: "Learn about costs, fees, and secure payment methods",
+      learnMore: "Learn More",
+      doctorSectionTitle: "Your Reviewing Specialist",
+      cta: "Continue to Upload"
+    },
+
+    // Doctor Profile Detail
+    doctorProfile: {
+      name: "Dr. Satyender Sharma",
+      credentials: "Radiologist, MBBS, MD",
+      experience: "25+ Years Experience",
+      expertiseTitle: "Verified Expertise",
+      expertiseList: ["Scan Interpretation", "Pathology Review", "Hematology", "Case Analysis"],
+      bioTitle: "Professional Bio",
+      bioContent: "Dr. Sharma is a senior consultant specializing in clinical diagnostics. He oversees the Praman AI verification process to ensure that every AI-generated insight aligns with established medical protocols and clinical accuracy.",
+      feeNote: "A flat ₹500 fee applies to all specialist consultations.",
+      cta: "Start Analysis with Dr. Sharma"
+    },
+
+    // Payment Learn More
+    paymentGuide: {
+      title: "Payment & Costs Guide",
+      totalFeeLabel: "Total Specialist Review Fee",
+      amount: "₹500.00",
+      breakdownTitle: "What's included:",
+      steps: [
+        "Expert AI Pre-Check",
+        "Secure Case Organization",
+        "Verified Specialist Review",
+        "Diagnostic Second Opinion Report"
+      ],
+      securityTitle: "Secure & Transparent Payment Gateway",
+      securityDesc: "Transactions are encrypted for your security.",
+      cta: "Proceed to Secure Payment"
+    },
+
     newUserDesc: "You don't have any existing health records. You want to upload medical records to get started?",
     acceptedFormats: "Accepted format: PDF, JPEG, PNG (Max size: 50MB)",
     uploadPdf: "Upload PDF",
@@ -100,7 +150,8 @@ welcome: {
     tabExisting: "Upload to existing topic",
     recentReports: "Recent Reports", 
     addMore: "+ Add more documents", 
-    continueReview: "Continue to Review", 
+    continueUpload: "Continue to Upload", 
+    continuePayment: "Continue to Payment", 
     tabNewThread: "Start a new thread",
     securityNote: "Your medical information is encrypted and handled securely.",
     aiDisclaimer: "AI supports analysis. Final medical opinions are provided by licensed medical professionals.",
@@ -125,7 +176,7 @@ welcome: {
     changePasswordSub: "Update your security credentials",
     logout: "Logout",
     logoutSub: "Sign out of your account",
-    version: "Praman AI v1.0.4 (Beta)", // Updated to match your UI code
+    version: "Praman AI v1.0.4 (Beta)", 
     confirmLogout: "Are you sure you want to sign out?",
     support: "Help & Support",
     privacy: "Privacy Policy",

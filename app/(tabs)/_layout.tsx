@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+
 import { Tabs, usePathname, useRouter } from 'expo-router'; 
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications'; 
@@ -134,6 +135,7 @@ export default function TabLayout() {
   // --- UI Layouts ---
 
   const patientTabs = [
+    { name: 'Discover', icon: 'compass', path: '/(tabs)/patient/discover' },
     { name: 'Home', icon: 'home', path: '/(tabs)/patient/patienthome' },
     ...(isPatientHistoryVisible 
       ? [{ name: 'History', icon: 'chatbubble-ellipses', path: '/(tabs)/patient/history' }] 
@@ -155,6 +157,7 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" options={{ href: null }} />
+      <Tabs.Screen name="patient/discover" />
       <Tabs.Screen name="patient/patienthome" />
       <Tabs.Screen name="patient/history" /> 
       <Tabs.Screen name="settings" />

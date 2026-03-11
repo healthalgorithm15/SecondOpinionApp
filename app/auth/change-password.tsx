@@ -26,7 +26,7 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <ImageBackground source={require('@/assets/images/medical-bg.png')} style={styles.fullScreen}>
+    <ImageBackground source={require('@/assets/images/medical-bg.webp')} style={styles.fullScreen}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()}><Ionicons name="chevron-back" size={28} color="#0D9488" /></TouchableOpacity>

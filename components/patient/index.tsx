@@ -4,6 +4,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { STRINGS } from '../../constants/Strings';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../constants/theme';
 import ExistingUserDashboard from '../../components/patient/ExistingUserDashboard';
+import { PatientLandingUI } from './PatientLandingUI';
+import { DoctorProfileDetail } from './DoctorProfileDetail';
+import { PaymentLearnMore } from './PaymentLearnMore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -12,7 +15,7 @@ const { width, height } = Dimensions.get('window');
  * Provides the consistent medical background for all patient views.
  */
 export const BackgroundLayout = ({ children }: { children: React.ReactNode }) => (
-  <ImageBackground source={require('@/assets/images/medical-bg.png')} style={styles.fullScreen} resizeMode="cover">
+  <ImageBackground source={require('@/assets/images/medical-bg.webp')} style={styles.fullScreen} resizeMode="cover">
     <StatusBar barStyle="dark-content" />
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.mainContent}>{children}</View>
@@ -56,7 +59,8 @@ export const PatientExistingUI = ({
   onContinue, 
   onUploadPDF, 
   onScanPhoto,
-  onDeleteReport
+  onDeleteReport,
+  onAddMore
 }: { 
   reports: any[]; 
   name: string; 
@@ -64,6 +68,7 @@ export const PatientExistingUI = ({
   onUploadPDF: () => void; 
   onScanPhoto: () => void; 
   onDeleteReport: (id: string) => void;
+  onAddMore: () => void;
 }) => (
   <BackgroundLayout>
     <View style={styles.topHeader}><Text style={styles.brandTitle}>{STRINGS.common.appName}</Text></View>
@@ -72,7 +77,7 @@ export const PatientExistingUI = ({
         name={name} 
         reports={reports} 
         onContinue={onContinue} 
-        onAddMore={onUploadPDF} 
+        onAddMore={onAddMore} 
         onDeleteReport={onDeleteReport}
       />
     </ScrollView>
@@ -138,6 +143,8 @@ export const AccountSettingsUI = ({ userEmail, onLogout, onChangePassword }: Set
     </View>
   </BackgroundLayout>
 );
+
+export { PatientLandingUI, DoctorProfileDetail, PaymentLearnMore };
 
 const styles = StyleSheet.create({
   fullScreen: { width, height },

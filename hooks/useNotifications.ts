@@ -1,13 +1,30 @@
+if (Platform.OS === 'web') {
+  const globalAny: any = global;
+  globalAny.ExpoNotifications = globalAny.ExpoNotifications || {
+    // This is the specific method causing the crash in your call stack
+    getLastNotificationResponseAsync: () => Promise.resolve(null),
+    getLastNotificationResponse: () => null, 
+    addNotificationResponseReceivedListener: () => ({ remove: () => {} }),
+    removeNotificationSubscription: () => {},
+  };
+}
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
 /**
  * Generates an Expo Push Token for the current device.
- * Returns the token string or null if registration fails.
+ * Returns the token string or null if registration fails or if on Web.
  */
 export const registerForPushNotificationsAsync = async () => {
-  // 1. Physical Device Check (Push notifications don't work on most Emulators/Simulators)
+  // 🛡️ WEB GUARD: Browsers do not support Expo's native push notification system.
+  // This prevents the "getLastNotificationResponse is not available on web" error.
+  if (Platform.OS === 'web') {
+    console.log('🌐 Web platform detected: Skipping native push registration.');
+    return null;
+  }
+
+  // 1. Physical Device Check (Push notifications don't work on most Emulators)
   if (!Device.isDevice) {
     console.warn('Must use physical device for Push Notifications');
     return null;
@@ -31,7 +48,6 @@ export const registerForPushNotificationsAsync = async () => {
     }
 
     // 5. Fetch the Expo Push Token
-    // The projectId MUST match the one in your app.json and Azure Env Variables
     const tokenResponse = await Notifications.getExpoPushTokenAsync({
       projectId: 'e81e2f1d-4edc-4b90-869d-b9e7d0edcb36', 
     });
@@ -40,7 +56,6 @@ export const registerForPushNotificationsAsync = async () => {
     console.log("📲 Generated Expo Push Token:", token);
 
     // 6. Android-Specific Configuration
-    // Required for notifications to show up as banners on newer Android versions
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'default',
@@ -53,8 +68,6 @@ export const registerForPushNotificationsAsync = async () => {
     return token;
 
   } catch (error) {
-    // 🛡️ Error Guard: Ensures your login flow doesn't crash if the 
-    // Expo servers are down or the internet is unstable.
     console.error("❌ Error registering for push notifications:", error);
     return null;
   }

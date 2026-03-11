@@ -20,16 +20,16 @@ export default function ExistingUserDashboard({ name, reports, onContinue, onAdd
     }
   };
 
-const handleViewReport = (item: any) => {
+  const handleViewReport = (item: any) => {
     router.push({
       pathname: '/view/DocumentViewScreen',
       params: { 
-        docId: item._id,           // Used by viewer to build the API path
-        fileName: item.title,      // Displayed in the header
-        contentType: item.contentType, // Decides between PDF and Image
-        role: 'patient'            // Helps with conditional logic if needed
+        docId: item._id,           
+        fileName: item.title,      
+        contentType: item.contentType, 
+        role: 'patient'            
       }
-    } as any); // Type cast to 'any' to avoid router param strictness
+    } as any); 
   };
 
   const confirmDelete = (reportId: string) => {
@@ -59,7 +59,6 @@ const handleViewReport = (item: any) => {
             <ReportItem 
               key={item._id || index} 
               title={item.title} 
-              // Passing the date directly; ReportItem handles formatting
               date={item.reportDate}
               contentType={item.contentType} 
               onPress={() => handleViewReport(item)} 
@@ -75,6 +74,7 @@ const handleViewReport = (item: any) => {
         </TouchableOpacity>
       </BlurView>
 
+      {/* UPDATED: Button logic to match new flow labels */}
       <TouchableOpacity 
         style={[styles.primaryButton, isProcessing && { opacity: 0.8 }]} 
         onPress={handlePress}
@@ -83,7 +83,12 @@ const handleViewReport = (item: any) => {
         {isProcessing ? (
           <ActivityIndicator color="#FFF" />
         ) : (
-          <Text style={styles.buttonText}>{STRINGS.patient.continueReview}</Text>
+          <Text style={styles.buttonText}>
+            {/* If reports exist, we move to payment/review */}
+            {reports && reports.length > 0 
+              ? STRINGS.patient.continuePayment 
+              : STRINGS.patient.continueUpload}
+          </Text>
         )}
       </TouchableOpacity>
 
