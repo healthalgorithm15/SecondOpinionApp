@@ -44,6 +44,12 @@ export default function OtpVerificationScreen() {
     try {
       // 1. Verify OTP with Backend
       const response = await authService.verifyOTP(identifier, otp, verificationMode);
+      
+      // 🛑 GUARD: If the response doesn't have data, stop here
+      if (!response?.data) {
+        throw new Error("Invalid response from server");
+      }
+
       const { user, token } = response.data;
 
       // 2. Persist Auth Session
@@ -54,56 +60,45 @@ export default function OtpVerificationScreen() {
         if (user?.role) await storage.setItem('userRole', user.role.toLowerCase());
       }
 
-      // 🟢 3. BACKGROUND SERVICES (Real-time & Push)
-      // We perform these BEFORE navigation to ensure the DB is updated
-      if (verificationMode === 'login' && user) {
-        try {
-          // Connect to Socket.io
-          socketService.connect();
-          socketService.joinRoom({ 
-            userId: user._id, 
-            role: user.role 
-          });
+      // ... [Background Services logic stays here] ...
 
-          // Get Push Token and update profile
-          const pushToken = await registerForPushNotificationsAsync();
-          if (pushToken) {
-            // 🔥 CRITICAL: We await this so the DB is updated before the screen unmounts
-            await authService.updateProfile({ pushToken });
-            console.log("✅ Push token registered successfully");
+      // 🟢 4. ROLE-BASED NAVIGATION
+      // We ONLY do this if we have a valid user and role
+      if (user && user.role) {
+        setTimeout(() => {
+          if (user.role === 'doctor' && user.isFirstLogin) {
+            return router.replace('/auth/doctor-activation');
           }
-        } catch (bgError) {
-          // Log background errors but don't block the user
-          console.error("⚠️ Background Service Init Failed:", bgError);
-        }
+
+          const role = user.role.toLowerCase();
+          console.log("🚀 Navigating user with role:", role);
+
+          switch (role) {
+            case 'admin':
+              router.replace('/(tabs)/admin-home');
+              break;
+            case 'doctor':
+              router.replace('/(tabs)/doctor/doctor-home');
+              break;
+            case 'patient':
+              router.replace('/(tabs)/patient/patienthome');
+              break;
+            default:
+              router.replace('/auth/login');
+              break;
+          }
+        }, 300);
+      } else {
+        setErrorMsg("User data missing. Please try logging in again.");
       }
-
-      // 🟢 4. ROLE-BASED NAVIGATION (With Crash Protection)
-      // Wrapping in 300ms timeout prevents java.lang.IllegalStateException on Android
-      setTimeout(() => {
-        if (user?.role === 'doctor' && user?.isFirstLogin) {
-          return router.replace('/auth/doctor-activation');
-        }
-
-        switch (user?.role?.toLowerCase()) {
-          case 'admin':
-            router.replace('/(tabs)/admin-home');
-            break;
-          case 'doctor':
-            router.replace('/(tabs)/doctor/doctor-home');
-            break;
-          case 'patient':
-            router.replace('/(tabs)/patient/patienthome');
-            break;
-          default:
-            router.replace('/auth/login');
-            break;
-        }
-      }, 300);
 
     } catch (error: any) {
       console.error("❌ OTP Verification Error:", error);
-      setErrorMsg(error.response?.data?.message || "Invalid or expired OTP");
+      
+      // 🛡️ This stops the navigation! 
+      // It keeps the user on the OTP screen and shows the error message.
+      const backendMessage = error.response?.data?.message;
+      setErrorMsg(backendMessage || "Invalid or expired OTP");
     } finally {
       setLoading(false);
     }

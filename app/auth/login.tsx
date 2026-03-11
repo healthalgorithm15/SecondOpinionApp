@@ -58,7 +58,7 @@ export default function Login() {
 
   /**
    * handleLogin
-   * Includes fail-safe for SMTP 535 errors to ensure navigation works
+   * Updated with strict status guards to prevent unauthorized navigation
    */
   const handleLogin = async () => {
     setErrorMsg(null);
@@ -68,10 +68,10 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // API call to your backend controller
+      // 1. API call to your backend
       await authService.login(formData.identifier.trim(), formData.password);
       
-      // Standard successful navigation
+      // 2. SUCCESS: Navigate to OTP
       router.push({
         pathname: '/auth/otp' as any,
         params: { identifier: formData.identifier.trim(), mode: 'login' }
@@ -81,12 +81,21 @@ export default function Login() {
       const status = error.response?.status;
       const message = error.response?.data?.message || "";
 
-      // 🟢 PRODUCTION FAIL-SAFE:
-      // If the backend generated an OTP (verified by your console) but failed to 
-      // send the email/SMS (SMTP 535), the status is often 401 or 500.
-      // We check the message and navigate anyway so the user can enter the code manually.
-      if (message.includes('535') || message.includes('Username and Password') || message.includes('OTP sent')) {
-        console.warn("Notification delivery failed, but credentials verified. Navigating...");
+      console.log(`[Login] Error Status: ${status} | Message: ${message}`);
+
+      // 🛑 GUARD 1: Explicit Credentials Failure
+      // If the user isn't found (404) or password/OTP check failed (401), 
+      // we STOP and show the error on the login page.
+      if (status === 401 || status === 404) {
+        return setErrorMsg("Invalid email/mobile or password.");
+      }
+
+      // 🟢 FAIL-SAFE: Delivery issues
+      // Only navigate if credentials were correct but notification delivery failed
+      const isDeliveryError = message.includes('535') || message.includes('OTP sent') || message.includes('Username and Password');
+      
+      if (isDeliveryError) {
+        console.warn("Credentials verified, but SMTP/SMS failed. Navigating to OTP screen...");
         router.push({
           pathname: '/auth/otp' as any,
           params: { identifier: formData.identifier.trim(), mode: 'login' }
@@ -94,7 +103,7 @@ export default function Login() {
       } else if (status === 403) {
         setErrorMsg(message || "Please verify your account first.");
       } else {
-        setErrorMsg(message || "Invalid email/mobile or password.");
+        setErrorMsg(message || "An unexpected error occurred. Please try again.");
       }
     } finally {
       setLoading(false);
@@ -128,7 +137,7 @@ export default function Login() {
             <Text style={styles.label}>Email or Mobile Number</Text>
             <TextInput
               style={styles.input}
-              placeholder="name@email.com or 9876543210"
+              placeholder="name@emmmmmail.com or 9876543210"
               placeholderTextColor="rgba(15, 23, 42, 0.4)"
               autoCapitalize="none"
               value={formData.identifier}
@@ -179,7 +188,6 @@ export default function Login() {
             </TouchableOpacity>
           </View>
 
-          {/* Medical Disclaimer to fill space and build trust */}
           <View style={styles.disclaimerContainer}>
              <Text style={styles.disclaimerText}>
                Your medical data is encrypted with enterprise-grade security. 
@@ -198,10 +206,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, 
     paddingBottom: 40, 
     flexGrow: 1, 
-    justifyContent: 'center' // 🟢 Centers the card vertically
+    justifyContent: 'center' 
   },
-
-  
   glassCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
     borderRadius: 28,

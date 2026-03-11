@@ -12,12 +12,14 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
     <View style={styles.container}>
       <View style={styles.contentWrapper}>
         {tabs.map((tab) => {
-          // 🟢 Pro Logic: Handles both root path and group paths correctly
-          const isActive = tab.path === '' || tab.path === '/(tabs)'
-            ? pathname === '/' || pathname === '/index'
-            : pathname.includes(tab.path.replace('/(tabs)', ''));
+          // Clean the paths for comparison: Remove '(tabs)' and trailing slashes
+          const cleanTabPath = tab.path.replace('/(tabs)', '');
+          const cleanPathname = pathname === '/' ? '/index' : pathname;
+          
+          // Precision Logic: Match exact path or handle index
+          const isActive = cleanPathname === cleanTabPath || 
+                          (cleanTabPath === '/index' && cleanPathname === '/');
 
-          // Check if this is the primary action tab (Analyze)
           const isAnalyzeTab = tab.name === 'Analyze';
 
           return (
@@ -41,8 +43,7 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
 
               <Text style={[
                 styles.tabLabel, 
-                { color: isActive ? COLORS.secondary : COLORS.textSub },
-                isAnalyzeTab && { fontWeight: '700' }
+                { color: isActive ? COLORS.secondary : COLORS.textSub, fontWeight: isActive ? '700' : '400' },
               ]}>
                 {tab.name}
               </Text>

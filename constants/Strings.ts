@@ -113,15 +113,15 @@ export const STRINGS = {
 
     // Doctor Profile Detail
     doctorProfile: {
-      name: "Dr. Satyender Sharma",
+      name: "Dr. Vijay Neelakantam",
       credentials: "Radiologist, MBBS, MD",
       experience: "25+ Years Experience",
       expertiseTitle: "Verified Expertise",
       expertiseList: ["Scan Interpretation", "Pathology Review", "Hematology", "Case Analysis"],
       bioTitle: "Professional Bio",
-      bioContent: "Dr. Sharma is a senior consultant specializing in clinical diagnostics. He oversees the Praman AI verification process to ensure that every AI-generated insight aligns with established medical protocols and clinical accuracy.",
+      bioContent: "Dr. Vijay is a senior consultant specializing in clinical diagnostics. He oversees the Praman AI verification process to ensure that every AI-generated insight aligns with established medical protocols and clinical accuracy.",
       feeNote: "A flat ₹500 fee applies to all specialist consultations.",
-      cta: "Start Analysis with Dr. Sharma"
+      cta: "Start Analysis with Dr. Vijay"
     },
 
     // Payment Learn More

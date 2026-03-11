@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, BORDER_RADIUS, SHADOWS } from '../../constants/theme';
 import { STRINGS } from '../../constants/Strings';
@@ -7,6 +7,9 @@ import AuthLayout from '../AuthLayout';
 
 export const DoctorProfileDetail = ({ onBack }: { onBack: () => void }) => {
   const doc = STRINGS.patient.doctorProfile;
+
+  // 👉 UPDATE THIS PATH: For example, require('../../assets/images/doctor.jpg')
+  const doctorImageSource = require('../../assets/images/doctor.png'); 
 
   return (
     <AuthLayout 
@@ -20,19 +23,28 @@ export const DoctorProfileDetail = ({ onBack }: { onBack: () => void }) => {
       {/* Profile Hero */}
       <View style={styles.heroCard}>
         <View style={styles.avatarLarge}>
-          <FontAwesome5 name="user-md" size={60} color="#cbd5e1" />
+          
+          {/* ✅ FIXED: The image is now the only content, removing the overlay icon */}
+          <Image 
+            source={doctorImageSource} 
+            style={styles.doctorPhoto} 
+            resizeMode="cover"
+          />
+          
+          {/* The green checkbadge in the corner */}
           <View style={styles.verifiedBadge}>
             <MaterialCommunityIcons name="check-decagram" size={24} color="#4CAF50" />
           </View>
         </View>
+
         <Text style={[styles.docName, TYPOGRAPHY.header]}>{doc.name}</Text>
         <Text style={[styles.docCredentials, TYPOGRAPHY.body, { color: COLORS.textSub }]}>
           {doc.credentials}
         </Text>
         <View style={styles.expBadge}>
           <Text style={[TYPOGRAPHY.caption, { color: COLORS.primary, fontWeight: '700' }]}>
-    {doc.experience}
-  </Text>
+            {doc.experience}
+          </Text>
         </View>
       </View>
 
@@ -76,10 +88,34 @@ const styles = StyleSheet.create({
     marginTop: 10,
     ...SHADOWS.soft 
   },
-  avatarLarge: { width: 120, height: 120, borderRadius: 60, backgroundColor: COLORS.bgScreen, justifyContent: 'center', alignItems: 'center' },
-  verifiedBadge: { position: 'absolute', bottom: 5, right: 5, backgroundColor: 'white', borderRadius: 12 },
-  docName: { marginTop: 15, color: COLORS.textMain },
-  docCredentials: { marginTop: 4 },
+  avatarLarge: { 
+    width: 120, 
+    height: 120, 
+    borderRadius: 60, 
+    backgroundColor: COLORS.white, // Setting white background for cleaner frame
+    justifyContent: 'center', 
+    alignItems: 'center',
+    overflow: 'hidden', // Clips image to circle
+    borderWidth: 4,     // Thicker border for better visibility
+    borderColor: COLORS.border, // Subtle border color
+    position: 'relative' // Key for absolute positioning of badge
+  },
+  doctorPhoto: {
+    width: '100%',
+    height: '100%',
+    zIndex: 0 // Ensures image sits below badge
+  },
+  verifiedBadge: { 
+    position: 'absolute', 
+    bottom: -1, 
+    right: -1, 
+    backgroundColor: 'white', 
+    borderRadius: 14, 
+    padding: 2, 
+    zIndex: 1 // Sits above the image
+  },
+  docName: { marginTop: 15, color: COLORS.textMain, textAlign: 'center' },
+  docCredentials: { marginTop: 4, textAlign: 'center' },
   expBadge: { backgroundColor: '#E8F3F1', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 8, marginTop: 12 },
   sectionLabel: { color: COLORS.textMain, marginBottom: 12, marginTop: 20 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
