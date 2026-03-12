@@ -13,12 +13,11 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
       <View style={styles.contentWrapper}>
         {tabs.map((tab) => {
           // Clean the paths for comparison: Remove '(tabs)' and trailing slashes
-          const cleanTabPath = tab.path.replace('/(tabs)', '');
-          const cleanPathname = pathname === '/' ? '/index' : pathname;
+          const cleanTabPath = tab.path.replace('/(tabs)/', '');
+  const cleanPathname = pathname.replace('/(tabs)/', '').replace(/^\//, '');
           
           // Precision Logic: Match exact path or handle index
-          const isActive = cleanPathname === cleanTabPath || 
-                          (cleanTabPath === '/index' && cleanPathname === '/');
+         const isActive = cleanPathname === cleanTabPath;
 
           const isAnalyzeTab = tab.name === 'Analyze';
 

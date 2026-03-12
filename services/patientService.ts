@@ -4,6 +4,10 @@ import API from '../utils/api';
 /**
  * patientService
  * Handles all medical record and review operations for the patient role.
+ * Manages transitions between:
+ * Scenario 1: New Patient (Empty State)
+ * Scenario 2: Drafts (Uploaded but not submitted)
+ * Scenario 3: Active Case (AI/Doctor review in progress)
  */
 export const patientService = {
   /**
@@ -65,55 +69,58 @@ export const patientService = {
   /**
    * 📄 GET SECURE DOWNLOAD URL
    * Returns the full endpoint path for downloading a PDF.
-   * Used by Expo-File-System to download the file before viewing.
+   * Used by Expo-File-System or browser downloads.
    */
   getRecordFileUrl: (recordId: string) => {
-    // This uses your existing axios base URL configuration
     return `${API.defaults.baseURL}/patient/record/${recordId}/file`;
   },
 
   /**
    * Handles multi-platform file uploads with Android URI fixes.
+   * Supports both PDF documents and Image-to-PDF scans.
    */
   uploadRecord: async (fileUri: string, fileName: string, mimeType: string) => {
-    const formData = new FormData();
+  const formData = new FormData();
 
-    if (Platform.OS === 'web') {
-      const response = await fetch(fileUri);
-      const blob = await response.blob();
-      formData.append('file', blob, fileName); 
-    } else {
-      const uploadUri = Platform.OS === 'ios' 
-        ? fileUri.replace('file://', '') 
-        : fileUri;
+  if (Platform.OS === 'web') {
+    const response = await fetch(fileUri);
+    const blob = await response.blob();
+    formData.append('file', blob, fileName); 
+  } else {
+    // Ensure the URI is clean for native platforms
+    const uploadUri = Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri;
 
-      formData.append('file', {
-        uri: uploadUri,
-        name: fileName || 'upload.pdf',
-        type: mimeType || 'application/pdf',
-      } as any);
-    }
+    // @ts-ignore - FormData in RN requires this specific object structure
+    formData.append('file', {
+      uri: uploadUri,
+      name: fileName || 'upload.pdf',
+      type: mimeType || 'application/pdf',
+    });
+  }
 
-    formData.append('title', fileName || 'Medical Report');
-    formData.append('category', 'General'); 
+  formData.append('title', fileName || 'Medical Report');
+  formData.append('category', 'General'); 
 
-    try {
-      const response = await API.post('/patient/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        transformRequest: (data) => data,
-      });
-      return response.data;
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || error.message;
-      console.error("❌ Upload Error Details:", errorMsg);
-      throw error;
-    }
-  },
+  try {
+    const response = await API.post('/patient/upload', formData, {
+      headers: {
+        // Letting Axios/Native layer handle Content-Type + Boundary
+        'Accept': 'application/json',
+      },
+      transformRequest: (data) => data,
+    });
+    return response.data;
+  } catch (error: any) {
+    // Centralized log format
+    const msg = error.response?.data?.message || error.message;
+    console.error("❌ Upload Error:", msg);
+    throw error;
+  }
+},
 
   /**
    * Polling/Fetching endpoint for Scenario 3 (Active Stepper Status).
+   * Retrieves status: 'AI_PROCESSING' | 'PENDING_DOCTOR' | 'COMPLETED'
    */
   getCaseStatus: async (caseId: string) => {
     try {
@@ -127,6 +134,7 @@ export const patientService = {
 
   /**
    * Fetches all past cases (Medical Vault / History Modal).
+   * Usually filtered by status 'COMPLETED' on the frontend or backend.
    */
   getReviewHistory: async (page = 1, limit = 10) => {
     try {

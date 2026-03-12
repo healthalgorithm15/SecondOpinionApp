@@ -47,18 +47,17 @@ API.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
     const originalRequest = error.config;
+    const isLoginRequest = originalRequest.url.includes('/auth/login');
+
+if (error.response?.status === 401 && !isLoginRequest && !originalRequest._retry) {
+      console.log("🚨 Session Expired");
+      await storage.removeItem('userToken');
+      await storage.removeItem('userData');
+      router.replace('/auth/login'); 
+    }
 
     // Detect if the user's session has expired or token is invalid
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      console.log("🚨 Session Expired - Redirecting to Login");
-      
-      // Clear sensitive data
-      await storage.removeItem('userToken');
-      await storage.removeItem('userData'); // Clear cached user role/details
-      
-      // Redirect to login (Expo Router)
-      router.replace('../(auth)/login');
-    }
+  
 
     // Optional: Handle 403 Forbidden (e.g., Patient trying to access Admin screens)
     if (error.response?.status === 403) {

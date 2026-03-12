@@ -60,55 +60,39 @@ export default function Login() {
    * handleLogin
    * Updated with strict status guards to prevent unauthorized navigation
    */
-  const handleLogin = async () => {
-    setErrorMsg(null);
-    const validationError = validateForm();
-    if (validationError) return setErrorMsg(validationError);
+ const handleLogin = async () => {
+  setErrorMsg(null);
+  const validationError = validateForm();
+  if (validationError) return setErrorMsg(validationError);
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      // 1. API call to your backend
-      await authService.login(formData.identifier.trim(), formData.password);
-      
-      // 2. SUCCESS: Navigate to OTP
+  try {
+    const res = await authService.login(formData.identifier.trim(), formData.password);
+    
+    // ✅ ONLY navigate here if the request was successful
+    if (res.success || res.token) {
       router.push({
         pathname: '/auth/otp' as any,
         params: { identifier: formData.identifier.trim(), mode: 'login' }
       });
-
-    } catch (error: any) {
-      const status = error.response?.status;
-      const message = error.response?.data?.message || "";
-
-      console.log(`[Login] Error Status: ${status} | Message: ${message}`);
-
-      // 🛑 GUARD 1: Explicit Credentials Failure
-      // If the user isn't found (404) or password/OTP check failed (401), 
-      // we STOP and show the error on the login page.
-      if (status === 401 || status === 404) {
-        return setErrorMsg("Invalid email/mobile or password.");
-      }
-
-      // 🟢 FAIL-SAFE: Delivery issues
-      // Only navigate if credentials were correct but notification delivery failed
-      const isDeliveryError = message.includes('535') || message.includes('OTP sent') || message.includes('Username and Password');
-      
-      if (isDeliveryError) {
-        console.warn("Credentials verified, but SMTP/SMS failed. Navigating to OTP screen...");
-        router.push({
-          pathname: '/auth/otp' as any,
-          params: { identifier: formData.identifier.trim(), mode: 'login' }
-        });
-      } else if (status === 403) {
-        setErrorMsg(message || "Please verify your account first.");
-      } else {
-        setErrorMsg(message || "An unexpected error occurred. Please try again.");
-      }
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error: any) {
+    const status = error.response?.status;
+    const message = error.response?.data?.message || "";
+
+    // 🛑 If backend says "User found in DB: NO", it returns a 401 or 404
+    if (status === 401 || status === 404) {
+      setErrorMsg("Invalid email/mobile or password.");
+    } else if (status === 403) {
+      setErrorMsg(message || "Please verify your account first.");
+    } else {
+      setErrorMsg("An unexpected error occurred. Please try again.");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <AuthLayout
