@@ -4,6 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, usePathname } from 'expo-router';
 import { COLORS, SHADOWS, TYPOGRAPHY } from '../../constants/theme';
 
+/**
+ * BottomNav Component
+ * * High-end navigation bar for PramanAI.
+ * Features:
+ * - Dynamic path matching with group folder stripping.
+ * - Specialized styling for the 'Analyze' primary action.
+ * - Glassmorphism effects with subtle borders.
+ */
 export function BottomNav({ tabs }: { tabs: any[] }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -12,12 +20,16 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
     <View style={styles.container}>
       <View style={styles.contentWrapper}>
         {tabs.map((tab) => {
-          // Clean the paths for comparison: Remove '(tabs)' and trailing slashes
-          const cleanTabPath = tab.path.replace('/(tabs)/', '');
-  const cleanPathname = pathname.replace('/(tabs)/', '').replace(/^\//, '');
+          // 1. CLEAN PATHS FOR COMPARISON
+          // We strip out group folder identifiers like (tabs) and handle slashes
+          // to ensure the 'History' and 'Home' logic stays in sync.
+          const cleanTabPath = tab.path.replace(/\/\(.*\)\//, '').replace(/^\/|\/$/g, '');
+          const cleanPathname = pathname.replace(/\/\(.*\)\//, '').replace(/^\/|\/$/g, '');
           
-          // Precision Logic: Match exact path or handle index
-         const isActive = cleanPathname === cleanTabPath;
+          // 2. PRECISION MATCHING
+          // Handles both explicit paths and index-based routing.
+          const isActive = cleanPathname === cleanTabPath || 
+                           (cleanPathname === '' && cleanTabPath === 'index');
 
           const isAnalyzeTab = tab.name === 'Analyze';
 
@@ -42,7 +54,10 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
 
               <Text style={[
                 styles.tabLabel, 
-                { color: isActive ? COLORS.secondary : COLORS.textSub, fontWeight: isActive ? '700' : '400' },
+                { 
+                  color: isActive ? COLORS.secondary : COLORS.textSub, 
+                  fontWeight: isActive ? '700' : '400' 
+                },
               ]}>
                 {tab.name}
               </Text>
@@ -66,7 +81,7 @@ const styles = StyleSheet.create({
   },
   contentWrapper: {
     flexDirection: 'row',
-    backgroundColor: COLORS.overlay,
+    backgroundColor: COLORS.overlay || 'rgba(255, 255, 255, 0.95)',
     borderRadius: 24, 
     height: 75,
     ...SHADOWS.soft,
@@ -90,7 +105,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   analyzeIconContainer: {
-    backgroundColor: 'rgba(30, 93, 87, 0.1)', // Light version of primary
+    backgroundColor: 'rgba(30, 93, 87, 0.1)', 
     width: 45,
     height: 45,
     borderRadius: 22.5,

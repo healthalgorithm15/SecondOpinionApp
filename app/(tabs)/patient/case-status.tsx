@@ -10,14 +10,13 @@ import { Ionicons } from '@expo/vector-icons';
 import AuthLayout from '@/components/AuthLayout';
 import { PrimaryButton } from '@/components/ui/PrimaryButton';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '@/constants/theme';
-import { STRINGS } from '@/constants/Strings';
 
 // Logic
 import { patientService } from '@/services/patientService';
 
 export default function CaseStatus() {
   const router = useRouter();
-  const { caseId } = useLocalSearchParams();
+  const { caseId, mode } = useLocalSearchParams(); // Added mode here
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,6 +31,17 @@ export default function CaseStatus() {
       
       if (res.success) {
         setCaseData(res.data);
+        
+        // --- 🚀 NAVIGATION FIX ---
+        // If the mode is 'results' or the status is already COMPLETED,
+        // we jump straight to the summary instead of showing the "Waiting" screen.
+        const currentStatus = res.data?.status?.toUpperCase() || '';
+        if (mode === 'results' || currentStatus === 'COMPLETED' || currentStatus === 'REVIEWED') {
+          router.replace({
+            pathname: '/(tabs)/patient/case-summary',
+            params: { caseId: idToFetch }
+          } as any);
+        }
       } else if (res.status === 401) {
         router.replace('../auth/login');
       }
@@ -52,10 +62,7 @@ export default function CaseStatus() {
     fetchStatus();
   }, [caseId]);
 
-  // --- 🛠️ SIMPLIFIED PRODUCTION LOGIC ---
   const currentStatus = caseData?.status?.toUpperCase() || '';
-  
-  // The button only unlocks when the specialist has finished everything
   const isProcessComplete = ['COMPLETED', 'REVIEWED'].includes(currentStatus);
   
   const displayId = typeof caseId === 'string' 

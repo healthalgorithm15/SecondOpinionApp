@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router'; 
 import { Platform, ActivityIndicator, View } from 'react-native';
 import * as Notifications from 'expo-notifications'; 
@@ -24,10 +24,12 @@ export default function TabLayout() {
   const [role, setRole] = useState<string | null>(null);
   const [isPatientHistoryVisible, setIsPatientHistoryVisible] = useState(false);
   const [isDoctorHistoryVisible, setIsDoctorHistoryVisible] = useState(false);
+  const isChecking = useRef(false);
 
-  const lastNotificationResponse = Notifications.useLastNotificationResponse();
-
+  // Checks if the user has any COMPLETED cases to unlock the Vault/History tab
   const checkHistoryStatus = useCallback(async (currentRole: string) => {
+    if (isChecking.current) return;
+    isChecking.current = true;
     try {
       if (currentRole === 'patient') {
         const res = await patientService.getReviewHistory();
@@ -45,9 +47,12 @@ export default function TabLayout() {
       }
     } catch (err) {
       console.warn(`${currentRole} history check failed`);
+    } finally {
+      isChecking.current = false;
     }
   }, []);
 
+  // Handle Push Notification Redirection
   const handleNotificationAction = useCallback((data: any) => {
     if (!data || !data.caseId) return;
     if (data.screen === 'case-summary') {
@@ -56,6 +61,14 @@ export default function TabLayout() {
       router.push(`/(tabs)/doctor-review/${data.caseId}` as any);
     }
   }, [router]);
+
+  // Logic: Re-check history status whenever the user navigates
+  // This ensures the Vault tab appears immediately after viewing a completed report.
+  useEffect(() => {
+    if (role) {
+      checkHistoryStatus(role);
+    }
+  }, [pathname, role, checkHistoryStatus]);
 
   useEffect(() => {
     if (Platform.OS === 'android') {
@@ -78,6 +91,8 @@ export default function TabLayout() {
       const currentRole = savedRole ? savedRole.toLowerCase() : 'patient';
       setRole(currentRole);
       await checkHistoryStatus(currentRole);
+      
+      // Listen for real-time completion to unlock tabs
       socketService.on('caseCompleted', () => checkHistoryStatus(currentRole));
     };
     initializeLayout();
@@ -87,14 +102,16 @@ export default function TabLayout() {
   if (!role) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', backgroundColor: '#002D2D' }}>
-        <ActivityIndicator color={COLORS.primary} size="large" />
+        <ActivityIndicator color="#FFF" size="large" />
       </View>
     );
   }
 
+  // --- TABS DEFINITION ---
   const patientTabs = [
     { name: 'Discover', icon: 'compass', path: '/(tabs)/patient/discover' },
     { name: 'Home', icon: 'home', path: '/(tabs)/patient/patienthome' },
+    // Vault only shows if a case has been completed at least once
     ...(isPatientHistoryVisible ? [{ name: 'Vault', icon: 'library', path: '/(tabs)/patient/history' }] : []),
     { name: 'Settings', icon: 'settings', path: '/(tabs)/settings' },
   ];
@@ -111,17 +128,13 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen 
-        name="patient/patienthome" 
-        listeners={{
-          tabPress: () => router.setParams({ tab: 'home' }),
-        }}
-      />
+      <Tabs.Screen name="patient/patienthome" />
       <Tabs.Screen name="patient/discover" />
       <Tabs.Screen name="patient/history" /> 
       <Tabs.Screen name="settings" />
       <Tabs.Screen name="doctor/doctor-home" /> 
       <Tabs.Screen name="doctor/doctor-history" /> 
+      {/* Hidden Screens (No Tab Icon) */}
       <Tabs.Screen name="doctor-review/[caseId]" options={{ href: null }} />
       <Tabs.Screen name="patient/case-status" options={{ href: null }} />
       <Tabs.Screen name="patient/case-summary" options={{ href: null }} />

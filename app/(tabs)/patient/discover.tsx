@@ -1,110 +1,143 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { Animated, View, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native'; // 🟢 Added for auto-refresh
+import { useFocusEffect } from '@react-navigation/native';
 import { PatientLandingUI } from '@/components/patient/PatientLandingUI';
 import { DoctorProfileDetail } from '@/components/patient/DoctorProfileDetail';
 import { PaymentLearnMore } from '@/components/patient/PaymentLearnMore';
+import { patientService } from '@/services/patientService';
 import { storage } from '@/utils/storage';
-import { patientService } from '@/services/patientService'; // 🟢 Added
 
+// Define the possible views within this tab
 type ViewState = 'landing' | 'doctor' | 'payment';
 
 export default function DiscoverScreen() {
   const router = useRouter();
+  
+  // State Management
   const [userName, setUserName] = useState('User');
   const [currentView, setCurrentView] = useState<ViewState>('landing');
-  const [activeStatus, setActiveStatus] = useState<string | null>(null); // 🟢 State for tracker
+  const [activeStatus, setActiveStatus] = useState<string | null>(null);
   
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  // Animation Values
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [slideAnim] = useState(new Animated.Value(10));
 
-  // 1. Fetch User Profile Name once
+  /**
+   * 1. INITIAL LOAD
+   * Fetch static data like user name from local storage
+   */
   useEffect(() => {
-    startTransition();
-    const fetchUserName = async () => {
-      const savedName = await storage.getItem('userName');
-      if (savedName) setUserName(savedName);
+    const loadUser = async () => {
+      try {
+        const savedName = await storage.getItem('userName');
+        if (savedName) setUserName(savedName);
+      } catch (err) {
+        console.log("Error loading user from storage", err);
+      }
     };
-    fetchUserName();
+    loadUser();
   }, []);
 
-  // 2. 🟢 AUTO-UPDATE LOGIC: Runs every time screen comes into focus
+  /**
+   * 2. DATA FETCHING (DASHBOARD)
+   * Accesses res.data.activeCase.status to match your PatientController logic
+   */
+  const fetchDashboardData = async () => {
+    try {
+      const res = await patientService.getDashboard();
+      
+      // Verification: Controller returns { success: true, data: { activeCase: {...} } }
+      if (res.success && res.data && res.data.activeCase) {
+        console.log("Active Case Status found:", res.data.activeCase.status);
+        setActiveStatus(res.data.activeCase.status);
+      } else {
+        console.log("No active case found for tracker");
+        setActiveStatus(null);
+      }
+    } catch (err) {
+      console.error("Discover fetch error:", err);
+      setActiveStatus(null);
+    }
+  };
+
+  /**
+   * 3. AUTO-REFRESH ON TAB FOCUS
+   * This ensures that if a patient finishes a payment or uploads a report, 
+   * the tracker appears immediately when they return to this screen.
+   */
   useFocusEffect(
     useCallback(() => {
-      const fetchStatus = async () => {
-        try {
-          const res = await patientService.getDashboard();
-          if (res.success && res.activeCase) {
-            // Map backend status to user-friendly UI labels
-            const statusMap: Record<string, string> = {
-              'AI_PROCESSING': 'AI Analyzing...',
-              'PENDING_DOCTOR': 'Specialist Reviewing',
-              'COMPLETED': 'Report Ready'
-            };
-            setActiveStatus(statusMap[res.activeCase.status] || res.activeCase.status);
-          } else {
-            setActiveStatus(null);
-          }
-        } catch (err) {
-          console.error("Dashboard refresh failed:", err);
-        }
-      };
-
-      fetchStatus();
+      fetchDashboardData();
+      triggerAnimation();
     }, [])
   );
 
-  const startTransition = () => {
+  /**
+   * 4. UI TRANSITIONS
+   * Handles smooth fading between Landing, Doctor Profile, and Payment Info
+   */
+  const triggerAnimation = () => {
     fadeAnim.setValue(0);
-    scaleAnim.setValue(0.95);
+    slideAnim.setValue(10);
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 8, tension: 40, useNativeDriver: true }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      })
     ]).start();
   };
 
-  const handleViewChange = (view: ViewState) => {
+  const handleNavigate = (view: ViewState) => {
     setCurrentView(view);
-    startTransition();
+    triggerAnimation();
   };
-
-  const AnimatedWrapper = ({ children }: { children: React.ReactNode }) => (
-    <Animated.View style={[styles.flex, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-      {children}
-    </Animated.View>
-  );
 
   return (
     <View style={styles.container}>
-      {currentView === 'landing' && (
-        <AnimatedWrapper>
+      <Animated.View 
+        style={[
+          styles.content, 
+          { 
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
+        {currentView === 'landing' && (
           <PatientLandingUI 
             name={userName} 
-            activeCaseStatus={activeStatus} // 🟢 Pass dynamic status
+            activeCaseStatus={activeStatus} 
             onStart={() => router.push('/(tabs)/patient/patienthome')} 
-            onViewDoctor={() => handleViewChange('doctor')}
-            onViewPayment={() => handleViewChange('payment')}
+            onViewDoctor={() => handleNavigate('doctor')}
+            onViewPayment={() => handleNavigate('payment')}
           />
-        </AnimatedWrapper>
-      )}
+        )}
 
-      {currentView === 'doctor' && (
-        <AnimatedWrapper>
-          <DoctorProfileDetail onBack={() => handleViewChange('landing')} />
-        </AnimatedWrapper>
-      )}
+        {currentView === 'doctor' && (
+          <DoctorProfileDetail onBack={() => handleNavigate('landing')} />
+        )}
 
-      {currentView === 'payment' && (
-        <AnimatedWrapper>
-          <PaymentLearnMore onBack={() => handleViewChange('landing')} />
-        </AnimatedWrapper>
-      )}
+        {currentView === 'payment' && (
+          <PaymentLearnMore onBack={() => handleNavigate('landing')} />
+        )}
+      </Animated.View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF' },
-  flex: { flex: 1 }
+  container: {
+    flex: 1,
+    backgroundColor: '#FFF', // Matches your clean clinical theme
+  },
+  content: {
+    flex: 1,
+  },
 });
