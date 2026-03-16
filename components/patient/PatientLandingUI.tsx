@@ -20,80 +20,74 @@ export const PatientLandingUI = ({
   activeCaseStatus 
 }: LandingProps) => {
 
-  // Map backend status strings to UI labels and colors
   const getStatusDisplay = () => {
     switch (activeCaseStatus) {
       case 'AI_PROCESSING':
-        return { label: 'AI ANALYSIS IN PROGRESS', color: '#60A5FA' }; // Blue
+        return { label: 'AI ANALYSIS IN PROGRESS', color: '#60A5FA' };
       case 'PENDING_DOCTOR':
-        return { label: 'SPECIALIST REVIEW PENDING', color: '#FACC15' }; // Yellow
+        return { label: 'SPECIALIST REVIEW PENDING', color: '#FACC15' };
       case 'COMPLETED':
-        return { label: 'MEDICAL REPORT READY', color: '#4ADE80' }; // Green
+        return { label: 'MEDICAL REPORT READY ✅', color: '#22C55E' };
       default:
         return { label: 'SYNCHRONIZING...', color: '#94A3B8' };
     }
   };
   
-  const { label, color } = getStatusDisplay();
+  const statusInfo = getStatusDisplay();
+  const isCaseActive = !!activeCaseStatus;
 
   return (
-    <AuthLayout title="Praman AI" subtitle={`Hello, ${name}`}>
-      <ScrollView 
-        showsVerticalScrollIndicator={false} 
-        contentContainerStyle={styles.scrollContent}
-      >
-       
-        {/* ACTIVE CASE TRACKER STRIP - Only shows if status exists */}
-        {activeCaseStatus && (
+    <AuthLayout title="Praman AI" subtitle={`Welcome, ${name.split(' ')[0]}`}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
+        {/* Tracker Strip */}
+        {isCaseActive && (
           <TouchableOpacity 
-            style={styles.trackerContainer} 
+            style={[styles.trackerStrip, { borderColor: statusInfo.color + '40' }]} 
             onPress={onStart}
-            activeOpacity={0.9}
           >
-            <View style={[styles.trackerBorder, { backgroundColor: color + '30' }]}>
-              <View style={styles.trackerContent}>
-                <View style={styles.trackerLeft}>
-                  <View style={[styles.pulseDot, { backgroundColor: color }]} />
-                  <View>
-                    <Text style={styles.trackerLabel}>ACTIVE CASE STATUS</Text>
-                    <Text style={[styles.trackerStatus, { color: color }]}>
-                      {label}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.trackerRight}>
-                  <Text style={styles.trackText}>View</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#FFF" />
-                </View>
-              </View>
-            </View>
+            <View style={[styles.statusDot, { backgroundColor: statusInfo.color }]} />
+            <Text style={[styles.statusText, { color: statusInfo.color }]}>
+              {statusInfo.label}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={statusInfo.color} />
           </TouchableOpacity>
         )}
 
-        {/* CLINICAL PRECISION CARD */}
+        {/* Main Action Button */}
+        <TouchableOpacity style={[styles.mainButton, SHADOWS.button]} onPress={onStart}>
+          <View style={styles.buttonInner}>
+            <Text style={styles.buttonText}>
+              {isCaseActive ? 'Track Active Case' : 'Start New Analysis'}
+            </Text>
+            <Ionicons name="arrow-forward" size={20} color="#FFF" />
+          </View>
+        </TouchableOpacity>
+
+        {/* Specialist Card */}
         <View style={styles.glassCard}>
           <View style={styles.cardHeader}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="shield-checkmark" size={20} color={COLORS.primary} />
-            </View>
-            <Text style={styles.cardTitle}>Clinical Precision</Text>
+             <View style={styles.iconCircle}>
+                <Ionicons name="medical-outline" size={20} color={COLORS.primary} />
+             </View>
+             <Text style={styles.cardTitle}>Specialist Panel</Text>
           </View>
           <Text style={styles.cardBody}>
-            AI analysis verified by senior consultants to ensure 100% accuracy.
+            Our AI works alongside top-tier medical specialists to ensure your diagnosis is 100% accurate and verified.
           </Text>
           <TouchableOpacity style={styles.cardLink} onPress={onViewDoctor}>
-            <Text style={styles.linkText}>Meet our Lead Consultant</Text>
+            <Text style={styles.linkText}>Meet the Doctors</Text>
             <Ionicons name="arrow-forward" size={16} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* PRICING CARD */}
+        {/* 🟢 RESTORED: Transparent Pricing Card */}
         <View style={styles.glassCard}>
           <View style={styles.cardHeader}>
-            <View style={styles.iconCircle}>
-              <Ionicons name="wallet-outline" size={20} color={COLORS.primary} />
-            </View>
-            <Text style={styles.cardTitle}>Transparent Pricing</Text>
+             <View style={styles.iconCircle}>
+                <Ionicons name="wallet-outline" size={20} color={COLORS.primary} />
+             </View>
+             <Text style={styles.cardTitle}>Transparent Pricing</Text>
           </View>
           <Text style={styles.cardBody}>
             No hidden costs. Get a comprehensive analysis for just ₹500 per report.
@@ -104,60 +98,75 @@ export const PatientLandingUI = ({
           </TouchableOpacity>
         </View>
 
-        {/* PROCESS SECTION */}
-        <View style={styles.processSection}>
-          <Text style={styles.processHeading}>Simple 3-Step Process</Text>
-          <View style={styles.stepRow}>
-            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
-            <Text style={styles.stepText}>Upload medical reports securely.</Text>
+        {/* Secure Vault Card */}
+        <View style={styles.glassCard}>
+          <View style={styles.cardHeader}>
+             <View style={styles.iconCircle}>
+                <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
+             </View>
+             <Text style={styles.cardTitle}>Secure Vault</Text>
           </View>
-          <View style={styles.stepRow}>
-            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
-            <Text style={styles.stepText}>Pay a one-time analysis fee.</Text>
-          </View>
-          <View style={styles.stepRow}>
-            <View style={[styles.stepNumber, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                <Text style={styles.stepNumberText}>3</Text>
-            </View>
-            <Text style={[styles.stepText, { opacity: 0.7 }]}>Receive verified AI report in 10 mins.</Text>
-          </View>
+          <Text style={styles.cardBody}>
+            All your medical history and reports are encrypted and stored in your private vault for future reference.
+          </Text>
         </View>
 
-        {/* MAIN CTA */}
-        <TouchableOpacity 
-          style={styles.mainButton} 
-          onPress={onStart}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.mainButtonText}>
-            {activeCaseStatus ? "Track Active Case" : "Start New Analysis"}
-          </Text>
-          <Ionicons name="arrow-forward" size={22} color="white" />
-        </TouchableOpacity>
+        {/* Process Section */}
+        <View style={styles.processSection}>
+          <Text style={styles.processHeading}>Simple 3-Step Process</Text>
+          
+          <View style={styles.stepRow}>
+            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>1</Text></View>
+            <View>
+              <Text style={styles.stepTitle}>Upload Reports</Text>
+              <Text style={styles.stepDesc}>Upload medical reports securely.</Text>
+            </View>
+          </View>
 
+          <View style={styles.stepRow}>
+            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>2</Text></View>
+            <View>
+              <Text style={styles.stepTitle}>Pay Analysis Fee</Text>
+              <Text style={styles.stepDesc}>Pay a one-time analysis fee.</Text>
+            </View>
+          </View>
+
+          <View style={styles.stepRow}>
+            <View style={styles.stepNumber}><Text style={styles.stepNumberText}>3</Text></View>
+            <View>
+              <Text style={styles.stepTitle}>Verified Report</Text>
+              <Text style={styles.stepDesc}>Receive verified AI report in 10 mins.</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </AuthLayout>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 120 },
-  trackerContainer: { marginBottom: 20, borderRadius: 16, overflow: 'hidden' },
-  trackerBorder: { padding: 2, borderRadius: 16 },
-  trackerContent: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    backgroundColor: '#1A2130', 
-    padding: 16, 
-    borderRadius: 14 
+  scrollContent: { paddingBottom: 40 },
+  trackerStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E293B',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    gap: 10
   },
-  trackerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  trackerLabel: { color: '#94A3B8', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
-  trackerStatus: { fontWeight: 'bold', fontSize: 14 },
-  pulseDot: { width: 10, height: 10, borderRadius: 5 },
-  trackerRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  trackText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 13, fontWeight: '800', flex: 1, letterSpacing: 0.5 },
+  mainButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 18,
+    paddingVertical: 18,
+    marginBottom: 24,
+  },
+  buttonInner: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
+  buttonText: { color: '#FFF', fontSize: 18, fontWeight: '800' },
   glassCard: { 
     padding: 20, 
     borderRadius: 20, 
@@ -176,17 +185,6 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 15, marginBottom: 18 },
   stepNumber: { width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center' },
   stepNumberText: { color: '#FFF', fontWeight: 'bold', fontSize: 15 },
-  stepText: { color: '#FFF', fontSize: 16, flex: 1, fontWeight: '500' },
-  mainButton: {
-    backgroundColor: COLORS.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 18,
-    borderRadius: 16,
-    gap: 10,
-    marginTop: 10,
-    ...SHADOWS.soft
-  },
-  mainButtonText: { color: 'white', fontSize: 18, fontWeight: '700' },
+  stepTitle: { fontSize: 16, fontWeight: '700', color: '#FFF' },
+  stepDesc: { fontSize: 14, color: '#94A3B8' },
 });

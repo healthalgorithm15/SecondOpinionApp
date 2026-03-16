@@ -20,16 +20,17 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
     <View style={styles.container}>
       <View style={styles.contentWrapper}>
         {tabs.map((tab) => {
-          // 1. CLEAN PATHS FOR COMPARISON
-          // We strip out group folder identifiers like (tabs) and handle slashes
-          // to ensure the 'History' and 'Home' logic stays in sync.
+          // 1. CLEAN PATHS
           const cleanTabPath = tab.path.replace(/\/\(.*\)\//, '').replace(/^\/|\/$/g, '');
           const cleanPathname = pathname.replace(/\/\(.*\)\//, '').replace(/^\/|\/$/g, '');
           
-          // 2. PRECISION MATCHING
-          // Handles both explicit paths and index-based routing.
-          const isActive = cleanPathname === cleanTabPath || 
-                           (cleanPathname === '' && cleanTabPath === 'index');
+          // 2. REFINED MATCHING (Parent-aware)
+          // We check if the current path starts with the tab path 
+          // (e.g., /patient/details should highlight the /patient tab)
+          const isHome = cleanTabPath === '' || cleanTabPath === 'index';
+          const isActive = isHome 
+            ? (cleanPathname === '' || cleanPathname === 'index')
+            : cleanPathname.startsWith(cleanTabPath);
 
           const isAnalyzeTab = tab.name === 'Analyze';
 
@@ -40,6 +41,7 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
               activeOpacity={0.7}
               onPress={() => router.replace(tab.path as any)}
             >
+              {/* Specialized 'Analyze' Button handling */}
               <View style={[
                 styles.iconContainer,
                 isAnalyzeTab && styles.analyzeIconContainer,
@@ -56,12 +58,14 @@ export function BottomNav({ tabs }: { tabs: any[] }) {
                 styles.tabLabel, 
                 { 
                   color: isActive ? COLORS.secondary : COLORS.textSub, 
-                  fontWeight: isActive ? '700' : '400' 
+                  fontWeight: isActive ? '700' : '400',
+                  opacity: isActive ? 1 : 0.8 // Subtle focus
                 },
               ]}>
                 {tab.name}
               </Text>
               
+              {/* Dot indicator for standard tabs */}
               {isActive && !isAnalyzeTab && <View style={styles.activeIndicator} />}
             </TouchableOpacity>
           );

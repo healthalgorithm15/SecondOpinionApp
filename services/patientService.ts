@@ -1,18 +1,28 @@
 import { Platform } from 'react-native';
 import API from '../utils/api';
 
-/**
- * patientService
- * Handles all medical record and review operations for the patient role.
- * Manages transitions between:
- * Scenario 1: New Patient (Empty State)
- * Scenario 2: Drafts (Uploaded but not submitted)
- * Scenario 3: Active Case (AI/Doctor review in progress)
- */
 export const patientService = {
   /**
+   * 📄 SMART VIEW/DOWNLOAD URL
+   * Correctly routes to either the 'record' endpoint or the 'view' endpoint.
+   * This prevents 404 errors by detecting the path type.
+   */
+  getRecordFileUrl: (path: string) => {
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+
+    // SCENARIO 1: Draft Records (Eye Icon in Upload Screen)
+    // If path is "record/ID/file", use the direct record endpoint
+    if (cleanPath.startsWith('record')) {
+      return `${API.defaults.baseURL}/patient/${cleanPath}`;
+    }
+
+    // SCENARIO 2: Final Reports (Case Summary Screen)
+    // If path is "pdf-ai/ID", use the view endpoint
+    return `${API.defaults.baseURL}/patient/view/${cleanPath}`;
+  },
+
+  /**
    * Fetches the patient's current dashboard data.
-   * Scenario 2 (Drafts) and Scenario 3 (Active Cases) are handled here.
    */
   getDashboard: async () => {
     try {
@@ -25,8 +35,7 @@ export const patientService = {
   },
 
   /**
-   * Deletes a specific medical record.
-   * Note: Backend only allows deletion if isSubmitted is false.
+   * Deletes a specific medical record (only if not submitted).
    */
   deleteRecord: async (id: string) => {
     try {
@@ -40,7 +49,6 @@ export const patientService = {
 
   /**
    * Triggers the AI and specialist review pipeline.
-   * Transitions records from Scenario 2 to Scenario 3.
    */
   submitForReview: async (reportIds: string[]) => {
     try {
@@ -53,8 +61,7 @@ export const patientService = {
   },
 
   /**
-   * 🟢 REUSES an existing record from history.
-   * Adds a pointer/copy of a historical document to the current dashboard drafts.
+   * Reuses an existing record from history.
    */
   reuseRecord: async (reportId: string) => {
     try {
@@ -67,60 +74,42 @@ export const patientService = {
   },
 
   /**
-   * 📄 GET SECURE DOWNLOAD URL
-   * Returns the full endpoint path for downloading a PDF.
-   * Used by Expo-File-System or browser downloads.
+   * Handles multi-platform file uploads with Android/iOS path fixes.
    */
-  getRecordFileUrl: (recordId: string) => {
-    return `${API.defaults.baseURL}/patient/record/${recordId}/file`;
+  uploadRecord: async (fileUri: string, fileName: string, mimeType: string) => {
+    const formData = new FormData();
+
+    if (Platform.OS === 'web') {
+      const response = await fetch(fileUri);
+      const blob = await response.blob();
+      formData.append('file', blob, fileName); 
+    } else {
+      const uploadUri = Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri;
+      // @ts-ignore
+      formData.append('file', {
+        uri: uploadUri,
+        name: fileName || 'upload.pdf',
+        type: mimeType || 'application/pdf',
+      });
+    }
+
+    formData.append('title', fileName || 'Medical Report');
+    formData.append('category', 'General'); 
+
+    try {
+      const response = await API.post('/patient/upload', formData, {
+        headers: { 'Accept': 'application/json' },
+        transformRequest: (data) => data,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Upload Error:", error.response?.data?.message || error.message);
+      throw error;
+    }
   },
 
   /**
-   * Handles multi-platform file uploads with Android URI fixes.
-   * Supports both PDF documents and Image-to-PDF scans.
-   */
-  uploadRecord: async (fileUri: string, fileName: string, mimeType: string) => {
-  const formData = new FormData();
-
-  if (Platform.OS === 'web') {
-    const response = await fetch(fileUri);
-    const blob = await response.blob();
-    formData.append('file', blob, fileName); 
-  } else {
-    // Ensure the URI is clean for native platforms
-    const uploadUri = Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri;
-
-    // @ts-ignore - FormData in RN requires this specific object structure
-    formData.append('file', {
-      uri: uploadUri,
-      name: fileName || 'upload.pdf',
-      type: mimeType || 'application/pdf',
-    });
-  }
-
-  formData.append('title', fileName || 'Medical Report');
-  formData.append('category', 'General'); 
-
-  try {
-    const response = await API.post('/patient/upload', formData, {
-      headers: {
-        // Letting Axios/Native layer handle Content-Type + Boundary
-        'Accept': 'application/json',
-      },
-      transformRequest: (data) => data,
-    });
-    return response.data;
-  } catch (error: any) {
-    // Centralized log format
-    const msg = error.response?.data?.message || error.message;
-    console.error("❌ Upload Error:", msg);
-    throw error;
-  }
-},
-
-  /**
-   * Polling/Fetching endpoint for Scenario 3 (Active Stepper Status).
-   * Retrieves status: 'AI_PROCESSING' | 'PENDING_DOCTOR' | 'COMPLETED'
+   * Retrieves active case status (Stepper).
    */
   getCaseStatus: async (caseId: string) => {
     try {
@@ -133,8 +122,7 @@ export const patientService = {
   },
 
   /**
-   * Fetches all past cases (Medical Vault / History Modal).
-   * Usually filtered by status 'COMPLETED' on the frontend or backend.
+   * Fetches all past completed cases.
    */
   getReviewHistory: async (page = 1, limit = 10) => {
     try {

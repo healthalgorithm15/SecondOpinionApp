@@ -4,21 +4,21 @@ import { router } from 'expo-router';
 
 /**
  * 🛠️ Configuration
- * Ensure your .env file has EXPO_PUBLIC_API_URL set.
- * For physical devices, use your computer's IP: http://192.168.x.x:5000/api
+ * baseURL uses the environment variable with a robust fallback.
+ * Timeout is set to 90s to accommodate high-res medical scans on slow networks.
  */
 const API = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL  || 'https://healthalgorithm-a5aqe6ckgzdmb0cf.southindia-01.azurewebsites.net/api',
-  timeout: 90000, // 15-second timeout for slow medical report uploads
+  baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://healthalgorithm-a5aqe6ckgzdmb0cf.southindia-01.azurewebsites.net/api',
+  timeout: 90000, 
 });
 
 /**
  * 🛡️ Request Interceptor
- * Injects the JWT token and handles FormData headers
+ * Injects JWT tokens and handles multi-user security.
  */
 API.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    // 1. Fetch token from SecureStore/AsyncStorage
+    // 1. Fetch token from SecureStore
     const token = await storage.getItem('userToken');
     
     if (token && config.headers) {
@@ -27,11 +27,15 @@ API.interceptors.request.use(
 
     // 2. Specialized handling for Medical Report Uploads (FormData)
     if (config.data instanceof FormData) {
-      // Axios usually sets this automatically, but deleting it 
-      // ensures the browser/mobile environment sets the correct boundary
-     // delete config.headers['Content-Type'];
-     config.headers['Content-Type'] = 'multipart/form-data';
-     config.transformRequest = [(data) => data];
+      // We set multipart/form-data but allow the native layer to append the boundary
+      config.headers['Content-Type'] = 'multipart/form-data';
+      config.transformRequest = [(data) => data];
+    }
+
+    // 3. 🛡️ Double-Tap Protection for Payments & Submissions
+    // Gives extra time for processing and prevents accidental double-requests
+    if (config.url?.includes('/submit-review') || config.url?.includes('/payment')) {
+      config.timeout = 120000; // 2 Minutes
     }
     
     return config;
@@ -41,27 +45,38 @@ API.interceptors.request.use(
 
 /**
  * 🛡️ Response Interceptor
- * Globally handles 401 (Unauthorized) and 403 (Forbidden) errors
+ * Handles session expiration (401) and permission denied (403)
  */
 API.interceptors.response.use(
   (response: AxiosResponse) => response,
   async (error) => {
     const originalRequest = error.config;
-    const isLoginRequest = originalRequest.url.includes('/auth/login');
+    
+    // Check if the request was to the login endpoint to avoid loops
+    const isLoginRequest = originalRequest?.url?.includes('/auth/login');
 
-if (error.response?.status === 401 && !isLoginRequest && !originalRequest._retry) {
-      console.log("🚨 Session Expired");
+    // 🚨 401 Unauthorized: Session Expired
+    if (error.response?.status === 401 && !isLoginRequest) {
+      console.log("🚨 Session Expired - Redirecting to Login");
+      
+      // Clear local state to prevent cross-user data leakage
       await storage.removeItem('userToken');
       await storage.removeItem('userData');
+      await storage.removeItem('userRole');
+
+      // Kick to login
       router.replace('/auth/login'); 
     }
 
-    // Detect if the user's session has expired or token is invalid
-  
-
-    // Optional: Handle 403 Forbidden (e.g., Patient trying to access Admin screens)
+    // 🚫 403 Forbidden: Permission Denied
     if (error.response?.status === 403) {
-      console.warn("🚫 Access Denied: Insufficient Permissions");
+      console.warn("🚫 Access Denied: User attempted to access unauthorized resource");
+      // You can optionally route to a "Forbidden" page here
+    }
+
+    // 🌐 Network / Timeout Errors
+    if (error.code === 'ECONNABORTED') {
+      console.error("⏱️ Request Timeout: The server took too long to respond.");
     }
 
     return Promise.reject(error);

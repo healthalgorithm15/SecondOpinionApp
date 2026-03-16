@@ -57,6 +57,8 @@ export default function OtpVerificationScreen() {
         await storage.setItem('userToken', token);
         if (user?._id) await storage.setItem('userId', user._id); 
         if (user?.name) await storage.setItem('userName', user.name);
+        if (user?.email) await storage.setItem('userEmail', user.email);
+        if (user?.mobile) await storage.setItem('userPhone', user.mobile);
         if (user?.role) await storage.setItem('userRole', user.role.toLowerCase());
       }
 
@@ -81,7 +83,7 @@ export default function OtpVerificationScreen() {
               router.replace('/(tabs)/doctor/doctor-home');
               break;
             case 'patient':
-              router.replace('/(tabs)/patient/patienthome');
+              router.replace('/(tabs)/patient/' as any);
               break;
             default:
               router.replace('/auth/login');

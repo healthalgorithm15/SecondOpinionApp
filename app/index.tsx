@@ -46,7 +46,7 @@ useEffect(() => {
           // your existing login/otp flow handles that specifically.
           router.replace('/(tabs)/doctor/doctor-home');
         } else if (role === 'patient') {
-          router.replace('/(tabs)/patient/patienthome');
+          router.replace('/(tabs)/patient/' as any);
         }
       }
     } catch (e) {

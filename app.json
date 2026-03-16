@@ -9,7 +9,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.healthalgorithm.secondmedapp"
+      "bundleIdentifier": "com.healthalgorithm.secondmedapp",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "package": "com.healthalgorithm.secondmedapp",
@@ -19,8 +20,8 @@
         "NOTIFICATIONS",
         "INTERNET",
         "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -37,6 +38,13 @@
     "plugins": [
       "expo-router",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#008080"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/icon.png",
@@ -51,6 +59,7 @@
         "expo-build-properties",
         {
           "android": {
+            "minSdkVersion": 21,
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
             "extraProguardRules": "-keep public class com.horcrux.svg.** { *; }\n-keep class com.facebook.react.bridge.NativeModule { *; }\n-keepattributes *Annotation*\n-keepclassmembers class ** {\n    @org.webkit.JavascriptInterface <methods>;\n}\n-keep class com.razorpay.** {*;}\n-dontwarn com.razorpay.**",
@@ -60,6 +69,9 @@
                 "**/libc++_shared.so"
               ]
             }
+          },
+          "ios": {
+            "useFrameworks": "static"
           }
         }
       ]

@@ -138,7 +138,7 @@ export default function CaseStatus() {
             }} 
           />
           
-          <TouchableOpacity style={styles.homeLink} onPress={() => router.replace('/(tabs)/patient/patienthome')}>
+          <TouchableOpacity style={styles.homeLink} onPress={() => router.replace('/(tabs)/patient' as any)}>
             <Text style={styles.homeLinkText}>Return to Home</Text>
           </TouchableOpacity>
         </View>

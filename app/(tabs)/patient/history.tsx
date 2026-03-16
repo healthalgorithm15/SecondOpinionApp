@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons'; // 🟢 Added Icons
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import AuthLayout from '../../../components/AuthLayout';
 import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../../constants/theme';
@@ -10,7 +10,7 @@ import { patientService } from '../../../services/patientService';
 export default function PatientHistory() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [reusingId, setReusingId] = useState<string | null>(null); // 🟢 Track specific reuse loading state
+  const [reusingId, setReusingId] = useState<string | null>(null);
   const [completedCases, setCompletedCases] = useState<any[]>([]);
 
   const loadHistory = useCallback(async () => {
@@ -29,10 +29,6 @@ export default function PatientHistory() {
     }
   }, []);
 
-  /**
-   * 🟢 REUSE LOGIC
-   * Sends the record back to the current drafts workspace
-   */
   const handleReuse = async (reportId: string) => {
     try {
       setReusingId(reportId);
@@ -43,7 +39,8 @@ export default function PatientHistory() {
           "Added to Vault",
           "This document has been added to your current drafts.",
           [
-            { text: "View Drafts", onPress: () => router.push('/patient/patienthome') },
+            // 🟢 FIXED: Navigate to the root patient tab index
+            { text: "View Drafts", onPress: () => router.push('/(tabs)/patient/' as any) },
             { text: "Keep Browsing", style: "cancel" }
           ]
         );
@@ -82,7 +79,7 @@ export default function PatientHistory() {
                     onPress={() => router.push({
                       pathname: "/patient/case-summary", 
                       params: { caseId: item._id }
-                    })}
+                    } as any)}
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={styles.date}>{new Date(item.createdAt).toLocaleDateString()}</Text>
@@ -96,7 +93,6 @@ export default function PatientHistory() {
                     <Ionicons name="chevron-forward" size={20} color={COLORS.secondary} />
                   </TouchableOpacity>
 
-                  {/* 🟢 REUSE ACTION BUTTON */}
                   <TouchableOpacity 
                     style={styles.reuseButton}
                     onPress={() => handleReuse(item.recordIds[0]?._id || item.recordIds[0])}

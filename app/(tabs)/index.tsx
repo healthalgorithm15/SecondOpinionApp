@@ -23,7 +23,7 @@ export default function HomeScreen() {
             } else if (role === 'admin') {
               router.replace('/(tabs)/admin-home');
             } else {
-              router.replace('/(tabs)/patient/patienthome');
+              router.replace('/(tabs)/patient' as any);
             }
           } else {
             router.replace('/auth/login');

@@ -1,119 +1,82 @@
+import RazorpayCheckout from 'react-native-razorpay';
+import API from '../utils/api'; 
+import { COLORS } from '../constants/theme';
 import { Alert } from 'react-native';
-/** * NOTE: For local Expo Go development, keep this commented.
- * Run 'npx expo prebuild' and use a Development Client to use the real SDK.
- */
-// import RazorpayCheckout from 'react-native-razorpay'; 
 
-// Pulls from your .env file
-const API_URL = process.env.EXPO_PUBLIC_API_URL;
-const RAZORPAY_KEY = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
-
-interface PaymentResponse {
-  success: boolean;
-  message?: string;
-  transaction?: any;
-}
-
-/**
- * processPayment
- * @param scanId - The ID of the medical scan
- * @param amount - Amount in PAISE (e.g., 50000 for ₹500)
- * @param patientId - The unique ID of the current user
- */
-export const processPayment = async (
-  scanId: string, 
-  amount: number, 
-  patientId: string
-): Promise<PaymentResponse> => {
+export const startPaymentFlow = async (
+  scanId: string,
+  patientId: string,
+  user: { email: string; phone: string; name: string }
+) => {
   try {
-    // 1. Request Order from Backend
-    const response = await fetch(`${API_URL}/api/payments/create`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        scanId, 
-        amount, 
-        patientId 
-      })
+    // 1. Backend creates order and returns order ID + verified price
+    // We send scanId as 'new_scan' if it's a fresh credit purchase
+    const response = await API.post('/payments/create-order', {
+      scanId,
+      patientId
     });
 
-    if (!response.ok) {
-      throw new Error("Failed to create order on server");
+    const order = response.data;
+
+    if (!order || !order.id) {
+      throw new Error("Invalid order received from server");
     }
 
-    const order = await response.json();
+    const razorpayKey = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID;
 
-    // 2. Open Payment Interface
-    return new Promise((resolve, reject) => {
-      
-      // --- PRODUCTION RAZORPAY LOGIC (Commented for Dev) ---
-      /*
-      const options = {
-        description: 'Specialist Scan Review - Praman AI',
-        image: 'https://your-domain.com/logo.png', // Update with your logo
-        currency: order.currency || 'INR',
-        key: RAZORPAY_KEY,
-        amount: order.amount,
-        name: 'Praman AI',
-        order_id: order.id,
-        prefill: {
-          email: 'patient@example.com', // Replace with real user data
-          contact: '919999999999',
-          name: 'Patient Name'
-        },
-        theme: { color: '#2196F3' } // Your brand color
-      };
+    if (!razorpayKey) {
+      console.error("RAZORPAY_KEY_ID is missing in environment variables");
+      throw new Error("Payment gateway configuration error");
+    }
 
-      RazorpayCheckout.open(options)
-        .then(async (data) => {
-          // Verify signature on backend
-          const verifyRes = await fetch(`${API_URL}/api/payments/verify`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-          });
-          resolve(await verifyRes.json());
-        })
-        .catch((error) => {
-          console.log("Razorpay Error:", error);
-          reject(error);
-        });
-      */
+    const options = {
+      description: 'Medical Analysis Credit',
+      image: 'https://your-logo-url.com/logo.png', // Replace with your actual hosted logo
+      currency: order.currency || 'INR',
+      key: razorpayKey, 
+      amount: Math.round(order.amount), // 🟢 Ensure it's a whole number (paise)
+      name: 'Praman AI',
+      order_id: order.id,
+      prefill: {
+        email: user.email || '',
+        contact: user.phone || '',
+        name: user.name || 'User'
+      },
+      theme: { color: COLORS.primary },
+      retry: {
+        enabled: true,
+        max_count: 3
+      }
+    };
 
-      // --- DEVELOPMENT / LOCAL STRATEGY ---
-      // This allows you to test the full flow without a real PAN/KYC gateway
-      Alert.alert(
-        "Secure Checkout", 
-        `Confirm payment of ₹${amount / 100} for specialist review?`, 
-        [
-          { text: "Cancel", onPress: () => reject("User cancelled"), style: "cancel" },
-          { 
-            text: "Pay Now", 
-            onPress: async () => {
-              try {
-                const verifyRes = await fetch(`${API_URL}/api/payments/verify`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    razorpay_order_id: order.id,
-                    razorpay_payment_id: "pay_dev_mock_" + Date.now(),
-                    razorpay_signature: "dev_bypass"
-                  })
-                });
-                const result = await verifyRes.json();
-                resolve(result);
-              } catch (e) {
-                reject(e);
-              }
-            } 
-          }
-        ]
-      );
+    // 2. Trigger Razorpay Checkout
+    const razorpayResponse = await RazorpayCheckout.open(options);
+
+    // 3. Post-payment verification call to our backend
+    // This is critical to prevent "fake" payment success reports
+    const { data: verification } = await API.post('/payments/verify-payment', {
+      razorpay_order_id: order.id,
+      razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+      razorpay_signature: razorpayResponse.razorpay_signature
     });
 
-  } catch (err) {
-    console.error("Payment Service Failure:", err);
-    Alert.alert("Payment Error", "Unable to process transaction at this time.");
-    throw err;
+    return {
+      success: verification.success,
+      data: verification,
+      cancelled: false
+    };
+
+  } catch (error: any) {
+    // 🟢 Handle user cancellation (Code 2 is specific to Razorpay SDK)
+    if (error.code === 2) {
+      console.log("Payment cancelled by user");
+      return { success: false, cancelled: true };
+    }
+
+    // Handle specific Razorpay errors
+    const errorMessage = error.description || error.message || "Payment initialization failed";
+    console.error("Razorpay Error:", error);
+    
+    throw new Error(errorMessage);
   }
 };

@@ -2,21 +2,17 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Tabs, usePathname, useRouter } from 'expo-router'; 
 import { Platform, ActivityIndicator, View } from 'react-native';
 import * as Notifications from 'expo-notifications'; 
-import { BottomNav } from '@/components/ui/BottomNav';
-import { storage } from '@/utils/storage';
-import { patientService } from '@/services/patientService';
-import { doctorService } from '@/services/doctorService';
-import { socketService } from '@/services/socketService';
-import { COLORS } from '@/constants/theme';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true, 
-    shouldShowList: true,   
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
+// Internal Imports
+import { BottomNav } from '../../components/ui/BottomNav';
+import { storage } from '../../utils/storage';
+import { patientService } from '../../services/patientService';
+import { doctorService } from '../../services/doctorService';
+import { socketService } from '../../services/socketService';
+import { COLORS } from '../../constants/theme';
+import API from '../../utils/api';
 
 export default function TabLayout() {
   const pathname = usePathname();
@@ -24,9 +20,36 @@ export default function TabLayout() {
   const [role, setRole] = useState<string | null>(null);
   const [isPatientHistoryVisible, setIsPatientHistoryVisible] = useState(false);
   const [isDoctorHistoryVisible, setIsDoctorHistoryVisible] = useState(false);
+  
   const isChecking = useRef(false);
 
-  // Checks if the user has any COMPLETED cases to unlock the Vault/History tab
+  // ✅ Fixed: Initialized with null to satisfy TypeScript
+  const responseListener = useRef<Notifications.Subscription | null>(null);
+
+  const registerForPushNotificationsAsync = async () => {
+    if (!Device.isDevice) return;
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      
+      if (finalStatus !== 'granted') return;
+
+      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+      const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+      const token = tokenData.data;
+      
+      await API.patch('/user/profile', { pushToken: token });
+      console.log("✅ Push Token Registered");
+    } catch (error) {
+      console.warn("Push Token Error:", error);
+    }
+  };
+
   const checkHistoryStatus = useCallback(async (currentRole: string) => {
     if (isChecking.current) return;
     isChecking.current = true;
@@ -34,9 +57,7 @@ export default function TabLayout() {
       if (currentRole === 'patient') {
         const res = await patientService.getReviewHistory();
         if (res.success && Array.isArray(res.data)) {
-          const hasFinished = res.data.some((c: any) => 
-            c.status?.trim().toUpperCase() === "COMPLETED"
-          );
+          const hasFinished = res.data.some((c: any) => c.status?.toUpperCase() === "COMPLETED");
           setIsPatientHistoryVisible(hasFinished);
         }
       } else if (currentRole === 'doctor') {
@@ -46,28 +67,29 @@ export default function TabLayout() {
         }
       }
     } catch (err) {
-      console.warn(`${currentRole} history check failed`);
+      console.warn("History check silent fail");
     } finally {
       isChecking.current = false;
     }
   }, []);
 
-  // Handle Push Notification Redirection
   const handleNotificationAction = useCallback((data: any) => {
-    if (!data || !data.caseId) return;
-    if (data.screen === 'case-summary') {
-      router.push({ pathname: '/(tabs)/patient/case-summary', params: { caseId: data.caseId } } as any);
-    } else {
-      router.push(`/(tabs)/doctor-review/${data.caseId}` as any);
+    // ✅ Fixed: Cast as any to bypass "property does not exist" type errors
+    const payload = data as any;
+    if (!payload?.caseId) return;
+    
+    if (payload.type === 'REPORT_READY' || payload.screen === 'case-summary') {
+      router.push({ 
+        pathname: '/(tabs)/patient/case-summary' as any, 
+        params: { caseId: payload.caseId } 
+      });
+    } else if (payload.type === 'NEW_CASE' || payload.screen === 'doctor-review') {
+      router.push(`/(tabs)/doctor-review/${payload.caseId}` as any);
     }
   }, [router]);
 
-  // Logic: Re-check history status whenever the user navigates
-  // This ensures the Vault tab appears immediately after viewing a completed report.
   useEffect(() => {
-    if (role) {
-      checkHistoryStatus(role);
-    }
+    if (role) checkHistoryStatus(role);
   }, [pathname, role, checkHistoryStatus]);
 
   useEffect(() => {
@@ -75,14 +97,20 @@ export default function TabLayout() {
       Notifications.setNotificationChannelAsync('default', {
         name: 'default',
         importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
       });
     }
-    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+
+    // Set the listener and store the subscription in the ref
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       handleNotificationAction(response.notification.request.content.data);
     });
-    return () => subscription.remove();
+
+    return () => {
+      // ✅ Fixed: Modern cleanup using .remove() on the subscription object
+      if (responseListener.current) {
+        responseListener.current.remove();
+      }
+    };
   }, [handleNotificationAction]);
 
   useEffect(() => {
@@ -90,11 +118,13 @@ export default function TabLayout() {
       const savedRole = await storage.getItem('userRole');
       const currentRole = savedRole ? savedRole.toLowerCase() : 'patient';
       setRole(currentRole);
+      
+      registerForPushNotificationsAsync();
       await checkHistoryStatus(currentRole);
       
-      // Listen for real-time completion to unlock tabs
       socketService.on('caseCompleted', () => checkHistoryStatus(currentRole));
     };
+
     initializeLayout();
     return () => { socketService.off('caseCompleted'); };
   }, [checkHistoryStatus]);
@@ -107,11 +137,9 @@ export default function TabLayout() {
     );
   }
 
-  // --- TABS DEFINITION ---
   const patientTabs = [
     { name: 'Discover', icon: 'compass', path: '/(tabs)/patient/discover' },
-    { name: 'Home', icon: 'home', path: '/(tabs)/patient/patienthome' },
-    // Vault only shows if a case has been completed at least once
+    { name: 'Home', icon: 'home', path: '/(tabs)/patient/' as any },
     ...(isPatientHistoryVisible ? [{ name: 'Vault', icon: 'library', path: '/(tabs)/patient/history' }] : []),
     { name: 'Settings', icon: 'settings', path: '/(tabs)/settings' },
   ];
@@ -128,13 +156,12 @@ export default function TabLayout() {
       screenOptions={{ headerShown: false }}
     >
       <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="patient/patienthome" />
+      <Tabs.Screen name="patient/index" />
       <Tabs.Screen name="patient/discover" />
       <Tabs.Screen name="patient/history" /> 
       <Tabs.Screen name="settings" />
       <Tabs.Screen name="doctor/doctor-home" /> 
       <Tabs.Screen name="doctor/doctor-history" /> 
-      {/* Hidden Screens (No Tab Icon) */}
       <Tabs.Screen name="doctor-review/[caseId]" options={{ href: null }} />
       <Tabs.Screen name="patient/case-status" options={{ href: null }} />
       <Tabs.Screen name="patient/case-summary" options={{ href: null }} />

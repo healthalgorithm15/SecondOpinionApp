@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react';
-
+import { useEffect, useState, useCallback } from 'react';
+import { View, ActivityIndicator, Platform, LogBox } from 'react-native';
 import { Stack } from 'expo-router';
-import { View, ActivityIndicator, Platform } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
-
 import * as Notifications from 'expo-notifications';
 import { 
   useFonts, 
@@ -13,11 +11,29 @@ import {
   Inter_700Bold 
 } from '@expo-google-fonts/inter';
 
-// Prevent the splash screen from hiding until fonts and notification logic are ready
-SplashScreen.preventAutoHideAsync();
+// Ignore specific logs that can clutter production monitoring
+LogBox.ignoreLogs(['Params being passed in navigation state']);
+
+// Prevent splash screen from hiding automatically
+SplashScreen.preventAutoHideAsync().catch(() => {
+  /* Reloading the app might trigger this; ignore it */
+});
+
+// ✅ Production Notification Config
+// We configure this outside the component to ensure it's registered early
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true, 
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 export default function RootLayout() {
-  const [isReady, setIsReady] = useState(false);
+  const [appIsReady, setAppIsReady] = useState(false);
 
   // 1. Load Custom Fonts
   const [fontsLoaded, fontError] = useFonts({
@@ -27,35 +43,35 @@ export default function RootLayout() {
     'Inter-Bold': Inter_700Bold,
   });
 
-  // 2. Initialize Native-Only Services (Notifications)
+  // 2. Resource Management
   useEffect(() => {
-    if (Platform.OS !== 'web') {
-      Notifications.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,      // Legacy support
-          shouldPlaySound: true,
-          shouldSetBadge: false,
-          // ✅ FIX for ts(2322): Modern Expo SDK requirements
-          shouldShowBanner: true, 
-          shouldShowList: true,
-        }),
-      });
+    async function prepare() {
+      try {
+        // If fonts are loaded or there's an error loading them, move forward
+        if (fontsLoaded || fontError) {
+          // You could fetch remote config or local storage keys here if needed
+          setAppIsReady(true);
+        }
+      } catch (e) {
+        console.warn('Preparation Error:', e);
+      }
     }
-  }, []);
 
-  // 3. Final Readiness Check
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      setIsReady(true);
-      // Small delay ensures smooth transition from splash to app
-      setTimeout(async () => {
-        await SplashScreen.hideAsync();
-      }, 100);
-    }
+    prepare();
   }, [fontsLoaded, fontError]);
 
-  // Loading State (while fonts are mounting)
-  if (!isReady) {
+  // 3. Smooth Transition Handler
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      // Small delay prevents a "flash" of white between splash and first screen
+      setTimeout(async () => {
+        await SplashScreen.hideAsync();
+      }, 150);
+    }
+  }, [appIsReady]);
+
+  // Loading State
+  if (!appIsReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
         <ActivityIndicator size="large" color="#1E7D75" />
@@ -64,32 +80,39 @@ export default function RootLayout() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      {/* --- Auth & Entry Flow --- */}
-      <Stack.Screen name="index" /> 
-      <Stack.Screen name="auth/login" />
-      <Stack.Screen name="auth/signup" />
-      <Stack.Screen name="auth/otp" />
-      <Stack.Screen name="auth/doctor-activation" /> 
-      
-      {/* --- Main Application Tabs --- */}
-      <Stack.Screen 
-        name="(tabs)" 
-        options={{ 
-          animation: 'fade',
-          gestureEnabled: false 
-        }} 
-      />
-
-      {/* --- Global Modals & Utilities --- */}
-      <Stack.Screen 
-        name="view/DocumentViewScreen" 
-        options={{ 
-          presentation: 'modal', 
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      <Stack
+        screenOptions={{
           headerShown: false,
-          // This allows the document viewer to slide up like a sheet on iOS
-        }} 
-      />
-    </Stack>
+          animation: Platform.OS === 'android' ? 'fade_from_bottom' : 'default',
+        }}
+      >
+        {/* Auth Flow */}
+        <Stack.Screen name="index" />
+        <Stack.Screen name="auth/login" />
+        <Stack.Screen name="auth/signup" />
+        <Stack.Screen name="auth/otp" />
+        <Stack.Screen name="auth/doctor-activation" />
+
+        {/* Tab Application */}
+        <Stack.Screen 
+          name="(tabs)" 
+          options={{ 
+            gestureEnabled: false,
+            animation: 'fade'
+          }} 
+        />
+
+        {/* Global Modal Viewers */}
+        <Stack.Screen 
+          name="view/DocumentViewScreen" 
+          options={{ 
+            presentation: 'modal',
+            headerShown: false,
+            gestureEnabled: true,
+          }} 
+        />
+      </Stack>
+    </View>
   );
 }
