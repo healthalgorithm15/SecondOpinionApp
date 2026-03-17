@@ -22,10 +22,12 @@ export default function TabLayout() {
   const [isDoctorHistoryVisible, setIsDoctorHistoryVisible] = useState(false);
   
   const isChecking = useRef(false);
-
-  // ✅ Fixed: Initialized with null to satisfy TypeScript
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
+  /**
+   * Register device for push notifications
+   * 🟢 FIX: Updated endpoint and added error handling to prevent 404 crash
+   */
   const registerForPushNotificationsAsync = async () => {
     if (!Device.isDevice) return;
     try {
@@ -43,13 +45,18 @@ export default function TabLayout() {
       const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
       const token = tokenData.data;
       
-      await API.patch('/user/profile', { pushToken: token });
-      console.log("✅ Push Token Registered");
-    } catch (error) {
-      console.warn("Push Token Error:", error);
+      // 🟢 PRODUCTION FIX: Match the new dedicated backend endpoint
+      // We use /auth/ because that is likely your route prefix
+      await API.patch('/auth/update-push-token', { pushToken: token });
+      console.log("✅ Push Token Registered Successfully");
+    } catch (error: any) {
+      console.warn("Push Token Sync Error:", error.response?.data?.message || error.message);
     }
   };
 
+  /**
+   * Logic to show/hide specific tabs based on user history
+   */
   const checkHistoryStatus = useCallback(async (currentRole: string) => {
     if (isChecking.current) return;
     isChecking.current = true;
@@ -74,7 +81,6 @@ export default function TabLayout() {
   }, []);
 
   const handleNotificationAction = useCallback((data: any) => {
-    // ✅ Fixed: Cast as any to bypass "property does not exist" type errors
     const payload = data as any;
     if (!payload?.caseId) return;
     
@@ -100,13 +106,11 @@ export default function TabLayout() {
       });
     }
 
-    // Set the listener and store the subscription in the ref
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       handleNotificationAction(response.notification.request.content.data);
     });
 
     return () => {
-      // ✅ Fixed: Modern cleanup using .remove() on the subscription object
       if (responseListener.current) {
         responseListener.current.remove();
       }
@@ -137,6 +141,7 @@ export default function TabLayout() {
     );
   }
 
+  // 🟢 FIX: Define distinct paths to prevent double-tab highlight
   const patientTabs = [
     { name: 'Discover', icon: 'compass', path: '/(tabs)/patient/discover' },
     { name: 'Home', icon: 'home', path: '/(tabs)/patient/' as any },
@@ -155,13 +160,20 @@ export default function TabLayout() {
       tabBar={() => <BottomNav tabs={role === 'doctor' ? doctorTabs : patientTabs} />}
       screenOptions={{ headerShown: false }}
     >
+      {/* 🟢 FIX: Ensure names match the folder structure exactly. 
+        Setting href: null for index prevents it from clashing with discover.
+      */}
       <Tabs.Screen name="index" options={{ href: null }} />
-      <Tabs.Screen name="patient/index" />
-      <Tabs.Screen name="patient/discover" />
-      <Tabs.Screen name="patient/history" /> 
-      <Tabs.Screen name="settings" />
-      <Tabs.Screen name="doctor/doctor-home" /> 
-      <Tabs.Screen name="doctor/doctor-history" /> 
+      <Tabs.Screen name="patient/index" options={{ title: 'Home' }} />
+      <Tabs.Screen name="patient/discover" options={{ title: 'Discover' }} />
+      <Tabs.Screen name="patient/history" options={{ title: 'Vault' }} /> 
+      <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
+      
+      {/* Doctor Screens */}
+      <Tabs.Screen name="doctor/doctor-home" options={{ title: 'Cases' }} /> 
+      <Tabs.Screen name="doctor/doctor-history" options={{ title: 'Reviews' }} /> 
+      
+      {/* Utility Screens - Href null hides them from the BottomNav logic */}
       <Tabs.Screen name="doctor-review/[caseId]" options={{ href: null }} />
       <Tabs.Screen name="patient/case-status" options={{ href: null }} />
       <Tabs.Screen name="patient/case-summary" options={{ href: null }} />

@@ -1,6 +1,7 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { storage } from './storage';
 import { router } from 'expo-router';
+import { Alert } from 'react-native';
 
 /**
  * 🛠️ Configuration
@@ -9,7 +10,11 @@ import { router } from 'expo-router';
  */
 const API = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://healthalgorithm-a5aqe6ckgzdmb0cf.southindia-01.azurewebsites.net/api',
-  timeout: 90000, 
+  timeout: 90000,
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  }
 });
 
 /**
@@ -18,24 +23,41 @@ const API = axios.create({
  */
 API.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    // 1. Fetch token from SecureStore
-    const token = await storage.getItem('userToken');
-    
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // 1. Sanitize URL to prevent double slashes (e.g., baseURL/ + /endpoint)
+    // This solves potential 404/500 issues on strict routing servers.
+    if (config.url?.startsWith('/')) {
+      config.url = config.url.substring(1);
     }
 
-    // 2. Specialized handling for Medical Report Uploads (FormData)
+    // 2. Check if token is already in 'defaults' (In-memory/hot token)
+    // This solves the race condition where storage.getItem is too slow after login.
+    let token = API.defaults.headers.common['Authorization'];
+
+    // 3. Fallback to SecureStore if not in memory
+    if (!token) {
+      const storedToken = await storage.getItem('userToken');
+      if (storedToken) {
+        token = `Bearer ${storedToken}`;
+        // Sync back to memory to speed up the next request
+        API.defaults.headers.common['Authorization'] = token;
+      }
+    }
+
+    // 4. Apply the token if found
+    if (token && config.headers) {
+      config.headers.Authorization = token;
+    }
+
+    // 5. Specialized handling for Medical Report Uploads (FormData)
     if (config.data instanceof FormData) {
-      // We set multipart/form-data but allow the native layer to append the boundary
       config.headers['Content-Type'] = 'multipart/form-data';
+      // Identity transform is crucial for FormData to work in React Native environments
       config.transformRequest = [(data) => data];
     }
 
-    // 3. 🛡️ Double-Tap Protection for Payments & Submissions
-    // Gives extra time for processing and prevents accidental double-requests
-    if (config.url?.includes('/submit-review') || config.url?.includes('/payment')) {
-      config.timeout = 120000; // 2 Minutes
+    // 6. 🛡️ Double-Tap Protection for Payments & Submissions
+    if (config.url?.includes('/submit-review') || config.url?.includes('/payment') || config.url?.includes('/create-order')) {
+      config.timeout = 120000; // 2 Minutes for high-stakes transactions
     }
     
     return config;
@@ -52,30 +74,47 @@ API.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     
-    // Check if the request was to the login endpoint to avoid loops
-    const isLoginRequest = originalRequest?.url?.includes('/auth/login');
+    // Safety check for network failure where no response object is returned
+    if (!error.response) {
+      console.error("🌐 Network Error: Check connection or Server status.");
+      return Promise.reject(error);
+    }
+    
+    // Avoid redirect loops if the login request itself fails
+    const isLoginRequest = originalRequest?.url?.includes('/auth/login') || originalRequest?.url?.includes('/verify-otp');
 
     // 🚨 401 Unauthorized: Session Expired
     if (error.response?.status === 401 && !isLoginRequest) {
-      console.log("🚨 Session Expired - Redirecting to Login");
+      console.log("🚨 Session Expired - Cleaning up and redirecting");
       
-      // Clear local state to prevent cross-user data leakage
-      await storage.removeItem('userToken');
-      await storage.removeItem('userData');
-      await storage.removeItem('userRole');
+      // Clear headers and storage to prevent cross-user data leakage
+      delete API.defaults.headers.common['Authorization'];
+      await Promise.all([
+        storage.removeItem('userToken'),
+        storage.removeItem('userData'),
+        storage.removeItem('userRole'),
+        storage.removeItem('userId')
+      ]);
 
-      // Kick to login
-      router.replace('/auth/login'); 
+      // Alert the user before kicking them out
+      Alert.alert(
+        "Session Expired",
+        "Please log in again to continue.",
+        [{ text: "OK", onPress: () => router.replace('/auth/login') }]
+      );
     }
 
     // 🚫 403 Forbidden: Permission Denied
     if (error.response?.status === 403) {
-      console.warn("🚫 Access Denied: User attempted to access unauthorized resource");
-      // You can optionally route to a "Forbidden" page here
+      console.warn("🚫 Access Denied: Unauthorized resource access.");
+      Alert.alert(
+        "Access Denied",
+        "You do not have permission to perform this action."
+      );
     }
 
     // 🌐 Network / Timeout Errors
-    if (error.code === 'ECONNABORTED') {
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
       console.error("⏱️ Request Timeout: The server took too long to respond.");
     }
 

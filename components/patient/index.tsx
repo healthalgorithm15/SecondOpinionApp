@@ -11,13 +11,18 @@ import ActiveTrackerView from '../../components/patient/ActiveTrackerView';
 import { patientService } from '../../services/patientService';
 import { COLORS } from '../../constants/theme';
 
-// 🟢 FIXED: Updated to resolve TS(2322) deprecation warning
+/**
+ * 🟢 FIXED: Notification Handler
+ * Explicitly includes both modern and legacy properties to satisfy the 
+ * NotificationBehavior type definition and resolve the TS(2322) error.
+ */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowBanner: true, 
-    shouldShowList: true,   
+    shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true, 
+    shouldShowList: true,   
   }),
 });
 
@@ -27,11 +32,18 @@ export default function PatientHomeScreen() {
   const router = useRouter();
   const appState = useRef(AppState.currentState);
 
+  /**
+   * 🟢 CORE SYNC LOGIC
+   * Normalizes the response to ensure draftReports and payment status are captured.
+   */
   const fetchState = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
       const response = await patientService.getDashboard();
-      setData(response);
+      
+      // Standardizes response regardless of Axios/Fetch wrapper
+      const result = response?.data?.data || response?.data || response;
+      setData(result);
     } catch (error) {
       console.error("Dashboard Sync Error:", error);
     } finally {
@@ -39,7 +51,7 @@ export default function PatientHomeScreen() {
     }
   }, []);
 
-  // 🟢 PUSH NOTIFICATIONS
+  // 🟢 PUSH NOTIFICATION SETUP
   useEffect(() => {
     const registerForPush = async () => {
       if (!Device.isDevice) return;
@@ -64,8 +76,8 @@ export default function PatientHomeScreen() {
     registerForPush();
 
     const notificationListener = Notifications.addNotificationReceivedListener(() => fetchState(true));
+    
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
-      // 🟢 FIXED: Type cast for payload
       const payload = response.notification.request.content.data as { caseId?: string };
       if (payload.caseId) {
         router.push({ 
@@ -81,6 +93,7 @@ export default function PatientHomeScreen() {
     };
   }, [fetchState]);
 
+  // 🟢 APP STATE LISTENER
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
@@ -93,29 +106,50 @@ export default function PatientHomeScreen() {
 
   useFocusEffect(useCallback(() => { fetchState(true); }, [fetchState]));
 
+  /**
+   * 🟢 DERIVED LOGIC
+   */
   const hasPaid = !!data?.activeCase || !!data?.hasActivePayment;
   const isCaseActive = data?.activeCase && data?.activeCase?.status !== 'COMPLETED';
 
   const handleFinalSubmission = async () => {
-    if (!data?.draftReports?.length) {
+    // Matches schema check for isSubmitted: false
+    if (!data?.draftReports || data.draftReports.length === 0) {
       Alert.alert("No Documents", "Please upload medical records first.");
       return;
     }
+
     try {
       setLoading(true);
       const reportIds = data.draftReports.map((r: any) => r._id);
-      await patientService.submitForReview(reportIds);
-      await fetchState(false);
+      
+      const response = await patientService.submitForReview(reportIds);
+      
+      if (response) {
+        await fetchState(false);
+        Alert.alert("Submitted", "Your reports are now being reviewed.");
+      }
     } catch (error: any) {
+      console.error("Submission Error:", error);
       Alert.alert("Error", error.response?.data?.message || "Failed to start review.");
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * 🟢 NAVIGATION HANDLER
+   * Points to the Discover tab where the Payment process is defined.
+   */
+  const handleNavigateToPayment = () => {
+    router.push('/(tabs)/discover' as any);
+  };
+
   if (loading && !data) {
     return (
-      <View style={styles.loader}><ActivityIndicator size="large" color={COLORS.primary} /></View>
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
     );
   }
 
@@ -129,7 +163,7 @@ export default function PatientHomeScreen() {
           />
         ) : (
           <UploadView 
-            name={data?.user?.name}
+            name={data?.user?.name || 'User'}
             drafts={data?.draftReports || []} 
             onUpdate={() => fetchState(true)}
             onFinalSubmit={handleFinalSubmission}
@@ -138,7 +172,10 @@ export default function PatientHomeScreen() {
               Alert.alert(
                 "Payment Required",
                 "You need an active credit to start an analysis.",
-                [{ text: "Later", style: "cancel" }, { text: "Get Credit", onPress: () => router.push('/(tabs)/discover' as any) }]
+                [
+                  { text: "Later", style: "cancel" }, 
+                  { text: "Get Credit", onPress: handleNavigateToPayment }
+                ]
               );
             }}
           />
@@ -149,6 +186,11 @@ export default function PatientHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.bgScreen },
+  loader: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: '#111827' 
+  },
   content: { flex: 1 }
 });

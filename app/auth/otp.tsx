@@ -18,6 +18,7 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { COLORS } from '../../constants/theme';
 import { authService } from '@/services/authService';
 import { storage } from '@/utils/storage'; 
+import API from '@/utils/api'; 
 
 // 🟢 Services for Real-time & Notifications
 import { socketService } from '@/services/socketService';
@@ -45,35 +46,53 @@ export default function OtpVerificationScreen() {
       // 1. Verify OTP with Backend
       const response = await authService.verifyOTP(identifier, otp, verificationMode);
       
-      // 🛑 GUARD: If the response doesn't have data, stop here
       if (!response?.data) {
         throw new Error("Invalid response from server");
       }
 
       const { user, token } = response.data;
 
-      // 2. Persist Auth Session
+      // 2. Persist Auth Session & Set Headers
       if (token) {
-        await storage.setItem('userToken', token);
-        if (user?._id) await storage.setItem('userId', user._id); 
-        if (user?.name) await storage.setItem('userName', user.name);
-        if (user?.email) await storage.setItem('userEmail', user.email);
-        if (user?.mobile) await storage.setItem('userPhone', user.mobile);
-        if (user?.role) await storage.setItem('userRole', user.role.toLowerCase());
+        // ⚡ CRITICAL: Set header in memory FIRST. 
+        // This ensures the very next API call (Payment/Socket) has the token.
+        API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+        // Save to local storage in parallel for speed
+        await Promise.all([
+          storage.setItem('userToken', token),
+          storage.setItem('userId', user._id || ''),
+          storage.setItem('userName', user.name || ''),
+          storage.setItem('userEmail', user.email || ''),
+          storage.setItem('userPhone', user.mobile || ''),
+          storage.setItem('userRole', user.role.toLowerCase()),
+        ]);
       }
 
-      // ... [Background Services logic stays here] ...
+      // 3. Initialize Background Services
+      // We pass the token directly to the socket to bypass storage latency
+      if (token) {
+        try {
+          // Attempting background initialization
+          await socketService.connect(token);
+          // Only register push notifications if we are in login mode
+          if (verificationMode === 'login') {
+            await registerForPushNotificationsAsync();
+          }
+        } catch (srvErr) {
+          console.warn("Background services init warning:", srvErr);
+        }
+      }
 
-      // 🟢 4. ROLE-BASED NAVIGATION
-      // We ONLY do this if we have a valid user and role
+      // 4. ROLE-BASED NAVIGATION
       if (user && user.role) {
+        const role = user.role.toLowerCase();
+        
+        // Small delay ensures state and storage are fully flushed
         setTimeout(() => {
-          if (user.role === 'doctor' && user.isFirstLogin) {
+          if (role === 'doctor' && user.isFirstLogin) {
             return router.replace('/auth/doctor-activation');
           }
-
-          const role = user.role.toLowerCase();
-          console.log("🚀 Navigating user with role:", role);
 
           switch (role) {
             case 'admin':
@@ -83,22 +102,21 @@ export default function OtpVerificationScreen() {
               router.replace('/(tabs)/doctor/doctor-home');
               break;
             case 'patient':
-              router.replace('/(tabs)/patient/' as any);
+              // 🟢 SUCCESS: Navigate specifically to the nested discover route
+              // This helps resolve the "Home" vs "Discover" icon highlight issue
+              router.replace('/(tabs)/patient/discover');
               break;
             default:
               router.replace('/auth/login');
               break;
           }
-        }, 300);
+        }, 300); 
       } else {
         setErrorMsg("User data missing. Please try logging in again.");
       }
 
     } catch (error: any) {
       console.error("❌ OTP Verification Error:", error);
-      
-      // 🛡️ This stops the navigation! 
-      // It keeps the user on the OTP screen and shows the error message.
       const backendMessage = error.response?.data?.message;
       setErrorMsg(backendMessage || "Invalid or expired OTP");
     } finally {
@@ -162,9 +180,7 @@ export default function OtpVerificationScreen() {
 }
 
 const styles = StyleSheet.create({
-  flexContainer: { 
-    flex: 1 
-  },
+  flexContainer: { flex: 1 },
   scrollContent: { 
     flexGrow: 1,
     paddingHorizontal: 20,
@@ -206,11 +222,7 @@ const styles = StyleSheet.create({
     width: '100%', 
     color: '#1E5D57' 
   } as TextStyle,
-  submitBtn: { 
-    width: '100%', 
-    marginTop: 10,
-    borderRadius: 16 
-  },
+  submitBtn: { width: '100%', marginTop: 10, borderRadius: 16 },
   errorBox: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -223,15 +235,8 @@ const styles = StyleSheet.create({
     borderColor: '#fee2e2'
   } as ViewStyle,
   errorText: { color: '#ef4444', fontSize: 13, fontWeight: '600', flex: 1 },
-  resendContainer: { 
-    marginTop: 28, 
-    alignItems: 'center' 
-  } as ViewStyle,
-  resendText: { 
-    color: '#475569',
-    fontSize: 14, 
-    marginBottom: 6 
-  } as TextStyle,
+  resendContainer: { marginTop: 28, alignItems: 'center' } as ViewStyle,
+  resendText: { color: '#475569', fontSize: 14, marginBottom: 6 } as TextStyle,
   resendLink: { 
     color: '#1E5D57', 
     fontWeight: '800', 

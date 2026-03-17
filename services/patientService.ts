@@ -5,19 +5,21 @@ export const patientService = {
   /**
    * 📄 SMART VIEW/DOWNLOAD URL
    * Correctly routes to either the 'record' endpoint or the 'view' endpoint.
-   * This prevents 404 errors by detecting the path type.
    */
   getRecordFileUrl: (path: string) => {
-    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    if (!path) return '';
+    // Normalize path by removing leading slash and 'patient/' prefix if present
+    let cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    if (cleanPath.startsWith('patient/')) {
+       cleanPath = cleanPath.replace('patient/', '');
+    }
 
-    // SCENARIO 1: Draft Records (Eye Icon in Upload Screen)
-    // If path is "record/ID/file", use the direct record endpoint
+    // SCENARIO 1: Draft Records (Binary stream from DB)
     if (cleanPath.startsWith('record')) {
       return `${API.defaults.baseURL}/patient/${cleanPath}`;
     }
 
-    // SCENARIO 2: Final Reports (Case Summary Screen)
-    // If path is "pdf-ai/ID", use the view endpoint
+    // SCENARIO 2: Final Reports / Historical Views
     return `${API.defaults.baseURL}/patient/view/${cleanPath}`;
   },
 
@@ -74,7 +76,8 @@ export const patientService = {
   },
 
   /**
-   * Handles multi-platform file uploads with Android/iOS path fixes.
+   * 🟢 PRODUCTION UPLOAD
+   * Handles multi-platform file uploads with boundary fixes.
    */
   uploadRecord: async (fileUri: string, fileName: string, mimeType: string) => {
     const formData = new FormData();
@@ -84,32 +87,41 @@ export const patientService = {
       const blob = await response.blob();
       formData.append('file', blob, fileName); 
     } else {
+      // Fix for iOS file pathing
       const uploadUri = Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri;
-      // @ts-ignore
-      formData.append('file', {
+      
+      const filePayload = {
         uri: uploadUri,
         name: fileName || 'upload.pdf',
         type: mimeType || 'application/pdf',
-      });
+      } as any;
+
+      formData.append('file', filePayload);
     }
 
-    formData.append('title', fileName || 'Medical Report');
+    formData.append('title', (fileName || 'Medical Report').trim());
     formData.append('category', 'General'); 
 
     try {
       const response = await API.post('/patient/upload', formData, {
-        headers: { 'Accept': 'application/json' },
+        headers: { 
+          // 🛡️ PRODUCTION FIX: Removing manual 'Content-Type' header.
+          // Axios/React Native will automatically set it WITH the required boundary.
+          'Accept': 'application/json' 
+        },
+        // Ensures Axios handles the FormData object correctly
         transformRequest: (data) => data,
       });
       return response.data;
     } catch (error: any) {
-      console.error("❌ Upload Error:", error.response?.data?.message || error.message);
+      const errorMsg = error.response?.data?.message || error.message;
+      console.error("❌ Upload Error:", errorMsg);
       throw error;
     }
   },
 
   /**
-   * Retrieves active case status (Stepper).
+   * Retrieves active case status (Stepper logic).
    */
   getCaseStatus: async (caseId: string) => {
     try {

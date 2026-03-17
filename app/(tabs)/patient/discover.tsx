@@ -26,19 +26,46 @@ export default function DiscoverScreen() {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(10));
 
-  const fetchDashboardData = async () => {
+  /**
+   * 🟢 CORE SYNC LOGIC
+   * Fetches the latest state. 
+   * 'hasActivePayment' is the boolean from the backend indicating an unused credit.
+   */
+  const fetchDashboardData = async (): Promise<boolean> => {
     try {
-      const data = await patientService.getDashboard();
+      const response = await patientService.getDashboard();
+      // Supports standard axios response or direct data
+      const data = response?.data?.data || response?.data || response;
+      
+      if (!data) return false;
+
       setUserName(data.user?.name || 'User');
       setUserId(data.user?._id || null);
       setActiveStatus(data.activeCase?.status || null);
       
-      // ✅ Production Logic: Enable upload if payment is confirmed or case is active
+      // STRICT RULE: If they have an active case OR a paid credit, they can proceed.
       const canProceed = !!data.activeCase || !!data.hasActivePayment;
+      
       setHasPaidCredit(canProceed);
+      return canProceed;
     } catch (error) {
       console.error("Discover Sync Error:", error);
+      return false;
     }
+  };
+
+  /**
+   * 🟢 POLLING HELPER
+   * Prevents the "I paid but can't upload" bug. 
+   * Retries 5 times (total 10s) to wait for the Razorpay Webhook to hit your DB.
+   */
+  const pollForPaymentStatus = async (maxAttempts = 5): Promise<boolean> => {
+    for (let i = 0; i < maxAttempts; i++) {
+      const isPaid = await fetchDashboardData();
+      if (isPaid) return true;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+    return false;
   };
 
   const triggerAnimation = useCallback(() => {
@@ -57,9 +84,12 @@ export default function DiscoverScreen() {
     }, [triggerAnimation])
   );
 
+  /**
+   * 🟢 START ANALYSIS HANDLER
+   * Checks the credit status before allowing navigation to the upload tab.
+   */
   const handleStartAnalysis = () => {
     if (hasPaidCredit) {
-      // ✅ Routes to the main patient tab where upload exists
       router.push('/(tabs)/patient' as any);
     } else {
       Alert.alert(
@@ -78,48 +108,75 @@ export default function DiscoverScreen() {
     triggerAnimation();
   };
 
+  /**
+   * 🟢 PAYMENT PROCESSOR
+   * Initiates payment and triggers the verification poll.
+   */
   const handlePaymentProcess = async () => {
-    if (!userId) {
-      Alert.alert("Session Error", "Please log in again to continue.");
-      return;
-    }
-
-    setLoading(true); // 🟢 Start Loader
+    setLoading(true); 
     try {
-      const email = await storage.getItem('userEmail') || '';
-      const phone = await storage.getItem('userPhone') || '';
-      
-      // 1. Trigger Razorpay Service
-      const result = await startPaymentFlow('new_scan', userId, { 
-        email, 
-        phone, 
+      const [storedId, email, phone] = await Promise.all([
+        storage.getItem('userId'),
+        storage.getItem('userEmail'),
+        storage.getItem('userPhone')
+      ]);
+
+      if (!storedId) {
+        setLoading(false);
+        Alert.alert("Session Expired", "Please log in again.");
+        router.replace('/auth/login');
+        return;
+      }
+
+      const result = await startPaymentFlow('new_scan', storedId, { 
+        email: email || '', 
+        phone: phone || '', 
         name: userName 
       });
       
-      // 2. Verification Handshake
-      if (result && result.success) {
-        await fetchDashboardData(); // Refresh local state
+      if (result?.success) {
+        // Step 1: Force poll the backend to confirm the 'Paid' status
+        const isVerified = await pollForPaymentStatus();
+        
+        // Step 2: Return to main view
         handleNavigate('landing');
-        Alert.alert("Success", "Analysis credit added! You can now start uploading.");
+        
+        if (isVerified) {
+          Alert.alert("Success", "Analysis credit added! You can now upload your reports.");
+        } else {
+          Alert.alert(
+            "Payment Processing", 
+            "Transaction successful. It might take a moment to reflect. You can refresh the page shortly."
+          );
+        }
       }
     } catch (error: any) {
-      // 2 is Razorpay's "User Cancelled" code
-      if (error.code !== 2 && error.code !== 'PAYMENT_CANCELLED') {
-        Alert.alert("Payment Issue", error.message || "Verification failed. Our server will process it shortly.");
+      // 🛡️ PRODUCTION GUARD: Handle cases where the backend says a credit already exists (400 error)
+      const isDuplicatePayment = error.response?.status === 400 && 
+                                  (error.response?.data?.code === 'UNUSED_CREDIT_EXISTS' || 
+                                   error.response?.data?.message?.toLowerCase().includes('credit'));
+
+      if (isDuplicatePayment) {
+        setHasPaidCredit(true);
+        handleNavigate('landing');
+        Alert.alert("Credit Available", "You already have an unused credit. Please proceed to upload.");
+      } else if (error.code !== 2 && error.code !== 'PAYMENT_CANCELLED') {
+        // Log original error for debugging
+        console.error("Payment Error Details:", error.response?.data || error.message);
+        Alert.alert("Payment Issue", error.response?.data?.message || error.message || "Process failed.");
       }
     } finally {
-      setLoading(false); // 🟢 Stop Loader
+      setLoading(false); 
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* 🟢 FULL SCREEN LOADING OVERLAY */}
       <Modal transparent visible={loading} animationType="fade">
         <View style={styles.loaderOverlay}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loaderText}>Verifying Transaction...</Text>
-          <Text style={styles.loaderSub}>Please do not close the app</Text>
+          <Text style={styles.loaderSub}>Finalizing credit with secure servers</Text>
         </View>
       </Modal>
 
@@ -154,19 +211,10 @@ const styles = StyleSheet.create({
   content: { flex: 1 },
   loaderOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(17, 24, 39, 0.9)',
+    backgroundColor: 'rgba(17, 24, 39, 0.98)',
     justifyContent: 'center',
     alignItems: 'center'
   },
-  loaderText: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '700',
-    marginTop: 20
-  },
-  loaderSub: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    marginTop: 8
-  }
+  loaderText: { color: '#FFF', fontSize: 18, fontWeight: '700', marginTop: 20 },
+  loaderSub: { color: '#9CA3AF', fontSize: 14, marginTop: 8 }
 });
