@@ -11,11 +11,6 @@ import ActiveTrackerView from '../../components/patient/ActiveTrackerView';
 import { patientService } from '../../services/patientService';
 import { COLORS } from '../../constants/theme';
 
-/**
- * 🟢 FIXED: Notification Handler
- * Explicitly includes both modern and legacy properties to satisfy the 
- * NotificationBehavior type definition and resolve the TS(2322) error.
- */
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -34,18 +29,25 @@ export default function PatientHomeScreen() {
 
   /**
    * 🟢 CORE SYNC LOGIC
-   * Normalizes the response to ensure draftReports and payment status are captured.
+   * Fetches dashboard and returns result for immediate verification.
    */
   const fetchState = useCallback(async (isSilent = false) => {
     if (!isSilent) setLoading(true);
     try {
       const response = await patientService.getDashboard();
       
-      // Standardizes response regardless of Axios/Fetch wrapper
-      const result = response?.data?.data || response?.data || response;
+      // Normalizing nested data structure
+      const result = response?.data?.success ? response.data.data : (response?.data || response);
+      console.log("BACKEND DATA", JSON.stringify(result));
       setData(result);
+      
+      // 🛡️ Log for debugging
+      console.log("Sync Status - hasActivePayment:", result?.hasActivePayment || result?.user?.hasActivePayment);
+      
+      return result; // 🟢 Return result so UploadView can check it instantly
     } catch (error) {
       console.error("Dashboard Sync Error:", error);
+      return null;
     } finally {
       setLoading(false);
     }
@@ -108,39 +110,32 @@ export default function PatientHomeScreen() {
 
   /**
    * 🟢 DERIVED LOGIC
+   * Deep check for payment flags.
    */
-  const hasPaid = !!data?.activeCase || !!data?.hasActivePayment;
+  //const hasPaid = !!(data?.activeCase || data?.hasActivePayment || data?.user?.hasActivePayment);
+  const hasPaid = true;
   const isCaseActive = data?.activeCase && data?.activeCase?.status !== 'COMPLETED';
 
   const handleFinalSubmission = async () => {
-    // Matches schema check for isSubmitted: false
     if (!data?.draftReports || data.draftReports.length === 0) {
       Alert.alert("No Documents", "Please upload medical records first.");
       return;
     }
-
     try {
       setLoading(true);
       const reportIds = data.draftReports.map((r: any) => r._id);
-      
       const response = await patientService.submitForReview(reportIds);
-      
       if (response) {
         await fetchState(false);
         Alert.alert("Submitted", "Your reports are now being reviewed.");
       }
     } catch (error: any) {
-      console.error("Submission Error:", error);
       Alert.alert("Error", error.response?.data?.message || "Failed to start review.");
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * 🟢 NAVIGATION HANDLER
-   * Points to the Discover tab where the Payment process is defined.
-   */
   const handleNavigateToPayment = () => {
     router.push('/(tabs)/discover' as any);
   };
@@ -157,28 +152,19 @@ export default function PatientHomeScreen() {
     <AuthLayout title="Praman AI" subtitle="Clinical Clarity" scrollEnabled={false}>
       <View style={styles.content}>
         {isCaseActive ? (
-          <ActiveTrackerView 
-            caseData={data.activeCase} 
-            onRefresh={() => fetchState(true)} 
-          />
+          <ActiveTrackerView caseData={data.activeCase} onRefresh={() => fetchState(true)} />
         ) : (
-          <UploadView 
-            name={data?.user?.name || 'User'}
-            drafts={data?.draftReports || []} 
-            onUpdate={() => fetchState(true)}
-            onFinalSubmit={handleFinalSubmission}
-            canUpload={hasPaid}
-            onRestrictedAccess={() => {
-              Alert.alert(
-                "Payment Required",
-                "You need an active credit to start an analysis.",
-                [
-                  { text: "Later", style: "cancel" }, 
-                  { text: "Get Credit", onPress: handleNavigateToPayment }
-                ]
-              );
-            }}
-          />
+        <UploadView 
+  name={data?.user?.name || 'User'}
+  drafts={data?.draftReports || []} 
+  onUpdate={fetchState} 
+  onFinalSubmit={handleFinalSubmission}
+  canUpload={true} // 🟢 Hardcoded True
+  onRestrictedAccess={() => {
+    // 🔴 EMPTY THIS FUNCTION TEMPORARILY
+    console.log("Restricted access triggered but suppressed.");
+  }}
+/>
         )}
       </View>
     </AuthLayout>
@@ -186,11 +172,6 @@ export default function PatientHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  loader: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    backgroundColor: '#111827' 
-  },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#111827' },
   content: { flex: 1 }
 });

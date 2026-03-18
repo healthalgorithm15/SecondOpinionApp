@@ -4,32 +4,30 @@ import API from '../utils/api';
 export const patientService = {
   /**
    * 📄 SMART VIEW/DOWNLOAD URL
-   * Correctly routes to either the 'record' endpoint or the 'view' endpoint.
    */
   getRecordFileUrl: (path: string) => {
     if (!path) return '';
-    // Normalize path by removing leading slash and 'patient/' prefix if present
     let cleanPath = path.startsWith('/') ? path.slice(1) : path;
     if (cleanPath.startsWith('patient/')) {
        cleanPath = cleanPath.replace('patient/', '');
     }
 
-    // SCENARIO 1: Draft Records (Binary stream from DB)
     if (cleanPath.startsWith('record')) {
       return `${API.defaults.baseURL}/patient/${cleanPath}`;
     }
 
-    // SCENARIO 2: Final Reports / Historical Views
     return `${API.defaults.baseURL}/patient/view/${cleanPath}`;
   },
 
   /**
-   * Fetches the patient's current dashboard data.
+   * 🟢 PRODUCTION DASHBOARD SYNC
+   * Returns the raw Axios response so that the UI can handle normalization.
    */
   getDashboard: async () => {
     try {
-      const response = await API.get('/patient/dashboard');
-      return response.data; 
+      // 🛡️ Returning the full response object allows PatientHomeScreen 
+      // to handle .data.data or .data extraction based on the API response structure.
+      return await API.get('/patient/dashboard');
     } catch (error: any) {
       console.error("❌ Get Dashboard Error:", error.response?.data || error.message);
       throw error;
@@ -37,7 +35,7 @@ export const patientService = {
   },
 
   /**
-   * Deletes a specific medical record (only if not submitted).
+   * Deletes a specific medical record.
    */
   deleteRecord: async (id: string) => {
     try {
@@ -77,7 +75,7 @@ export const patientService = {
 
   /**
    * 🟢 PRODUCTION UPLOAD
-   * Handles multi-platform file uploads with boundary fixes.
+   * Reinforced for multi-platform boundary handling.
    */
   uploadRecord: async (fileUri: string, fileName: string, mimeType: string) => {
     const formData = new FormData();
@@ -87,7 +85,7 @@ export const patientService = {
       const blob = await response.blob();
       formData.append('file', blob, fileName); 
     } else {
-      // Fix for iOS file pathing
+      // 🛡️ iOS/Android File Path Fix
       const uploadUri = Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri;
       
       const filePayload = {
@@ -105,11 +103,10 @@ export const patientService = {
     try {
       const response = await API.post('/patient/upload', formData, {
         headers: { 
-          // 🛡️ PRODUCTION FIX: Removing manual 'Content-Type' header.
-          // Axios/React Native will automatically set it WITH the required boundary.
-          'Accept': 'application/json' 
+          'Accept': 'application/json',
+          // 🛡️ DO NOT manually set Content-Type here; Axios sets the boundary automatically.
         },
-        // Ensures Axios handles the FormData object correctly
+        // Ensures Axios doesn't attempt to stringify the FormData object
         transformRequest: (data) => data,
       });
       return response.data;
@@ -121,7 +118,7 @@ export const patientService = {
   },
 
   /**
-   * Retrieves active case status (Stepper logic).
+   * Retrieves active case status.
    */
   getCaseStatus: async (caseId: string) => {
     try {
@@ -134,7 +131,7 @@ export const patientService = {
   },
 
   /**
-   * Fetches all past completed cases.
+   * Fetches past cases with pagination.
    */
   getReviewHistory: async (page = 1, limit = 10) => {
     try {
