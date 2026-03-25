@@ -5,17 +5,28 @@ export const patientService = {
   /**
    * 📄 SMART VIEW/DOWNLOAD URL
    */
+ /**
+   * 📄 SMART VIEW/DOWNLOAD URL
+   * Detects if we are viewing a static upload or a generated AI/Doctor report.
+   */
   getRecordFileUrl: (path: string) => {
     if (!path) return '';
-    let cleanPath = path.startsWith('/') ? path.slice(1) : path;
-    if (cleanPath.startsWith('patient/')) {
-       cleanPath = cleanPath.replace('patient/', '');
-    }
 
-    if (cleanPath.startsWith('record')) {
+    // 1. Clean up the path (remove leading slashes)
+    let cleanPath = path.startsWith('/') ? path.slice(1) : path;
+
+    // 2. ROUTE TO GENERATOR: If path starts with 'case/', it's for reportController.js
+    // Result: http://your-api.com/api/patient/case/pdf-ai/123
+    if (cleanPath.startsWith('case/')) {
       return `${API.defaults.baseURL}/patient/${cleanPath}`;
     }
 
+    // 3. ROUTE TO STORAGE: Default logic for viewing original uploaded files
+    // Result: http://your-api.com/api/patient/view/678
+    if (cleanPath.startsWith('patient/')) {
+       cleanPath = cleanPath.replace('patient/', '');
+    }
+    
     return `${API.defaults.baseURL}/patient/view/${cleanPath}`;
   },
 

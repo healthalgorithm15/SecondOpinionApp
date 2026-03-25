@@ -2,7 +2,7 @@
   "expo": {
     "name": "Praman AI",
     "slug": "secondmedapp",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "secondmedapp",
@@ -44,6 +44,10 @@
           "color": "#008080"
         }
       ],
+      "expo-file-system",
+      "expo-sharing",
+      "expo-secure-store",
+      "expo-font",
       [
         "expo-splash-screen",
         {
@@ -53,8 +57,6 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-secure-store",
-      "expo-font",
       [
         "expo-build-properties",
         {

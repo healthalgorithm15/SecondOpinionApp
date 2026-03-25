@@ -151,7 +151,7 @@ export const STRINGS = {
     recentReports: "Recent Reports", 
     addMore: "+ Add more documents", 
     continueUpload: "Continue to Upload", 
-    continuePayment: "Continue to Payment", 
+    submitAnalysis: "Submit for Review", 
     tabNewThread: "Start a new thread",
     securityNote: "Your medical information is encrypted and handled securely.",
     aiDisclaimer: "AI supports analysis. Final medical opinions are provided by licensed medical professionals.",

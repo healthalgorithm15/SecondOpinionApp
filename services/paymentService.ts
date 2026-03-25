@@ -1,7 +1,6 @@
 import RazorpayCheckout from 'react-native-razorpay';
 import API from '../utils/api'; 
 import { COLORS } from '../constants/theme';
-import { Alert } from 'react-native';
 
 export const startPaymentFlow = async (
   scanId: string,
@@ -9,8 +8,9 @@ export const startPaymentFlow = async (
   user: { email: string; phone: string; name: string }
 ) => {
   try {
-    // 1. Backend creates order and returns order ID + verified price
-    // We send scanId as 'new_scan' if it's a fresh credit purchase
+    console.log("💳 Step 1: Requesting Order ID from Backend...");
+    
+    // 1. Backend creates order and returns order ID
     const response = await API.post('/payments/create-order', {
       scanId,
       patientId
@@ -31,10 +31,10 @@ export const startPaymentFlow = async (
 
     const options = {
       description: 'Medical Analysis Credit',
-      image: 'https://your-logo-url.com/logo.png', // Replace with your actual hosted logo
+      image: 'https://your-logo-url.com/logo.png', 
       currency: order.currency || 'INR',
       key: razorpayKey, 
-      amount: Math.round(order.amount), // 🟢 Ensure it's a whole number (paise)
+      amount: Math.round(order.amount), 
       name: 'Praman AI',
       order_id: order.id,
       prefill: {
@@ -49,33 +49,55 @@ export const startPaymentFlow = async (
       }
     };
 
+    console.log("📲 Step 2: Opening Razorpay Checkout...");
+    
     // 2. Trigger Razorpay Checkout
     const razorpayResponse = await RazorpayCheckout.open(options);
 
-    // 3. Post-payment verification call to our backend
-    // This is critical to prevent "fake" payment success reports
+    /**
+     * 🟢 CRITICAL FIX: The "UI Breathe" Delay
+     * We wait 600ms to ensure the Razorpay Modal has completely unmounted 
+     * from the native UI layer before we start hitting our own APIs.
+     * This stops the "Something went wrong" native popup.
+     */
+    console.log("⏳ Success! Waiting for Modal to close...");
+    await new Promise(resolve => setTimeout(resolve, 600));
+
+    console.log("🛡️ Step 3: Verifying Signature with Backend...");
+
+    // 3. Post-payment verification call
     const { data: verification } = await API.post('/payments/verify-payment', {
       razorpay_order_id: order.id,
       razorpay_payment_id: razorpayResponse.razorpay_payment_id,
       razorpay_signature: razorpayResponse.razorpay_signature
     });
 
-    return {
-      success: verification.success,
-      data: verification,
-      cancelled: false
-    };
+    if (verification.success) {
+      console.log("✅ Payment Verified & Credits Updated.");
+      return {
+        success: true,
+        data: verification,
+        cancelled: false
+      };
+    } else {
+      throw new Error("Verification failed: Signature mismatch.");
+    }
 
   } catch (error: any) {
     // 🟢 Handle user cancellation (Code 2 is specific to Razorpay SDK)
     if (error.code === 2) {
-      console.log("Payment cancelled by user");
+      console.log("📡 Payment cancelled by user.");
       return { success: false, cancelled: true };
     }
 
-    // Handle specific Razorpay errors
-    const errorMessage = error.description || error.message || "Payment initialization failed";
-    console.error("Razorpay Error:", error);
+    // Handle the case where the user paid, but the backend verification failed
+    if (error.response && error.response.status === 500) {
+        console.error("🚨 CRITICAL: Payment Success but Backend Error", error.response.data);
+        throw new Error("Payment processed, but we had trouble updating your credits. Please do not retry; we are verifying it now.");
+    }
+
+    const errorMessage = error.description || error.message || "Payment failed";
+    console.error("❌ Razorpay/Payment Error:", error);
     
     throw new Error(errorMessage);
   }

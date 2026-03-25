@@ -14,13 +14,17 @@
       "android": {
         "buildType": "apk"
       },
-      "channel": "preview","env": {
+      "channel": "preview",
+      "env": {
         "EXPO_PUBLIC_API_URL": "https://healthalgorithm-a5aqe6ckgzdmb0cf.southindia-01.azurewebsites.net/api"
       }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://healthalgorithm-a5aqe6ckgzdmb0cf.southindia-01.azurewebsites.net/api"
+      }
     }
   },
   "submit": {
