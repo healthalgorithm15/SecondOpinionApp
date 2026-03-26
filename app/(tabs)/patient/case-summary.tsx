@@ -166,7 +166,7 @@ if ( downloadResult && await Sharing.isAvailableAsync()) {
             <Text style={styles.cardTitle}>Specialist Conclusion</Text>
           </View>
           
-          <Text style={styles.mainVerdict}>
+          {/*<Text style={styles.mainVerdict}>
             {caseData?.doctorOpinion?.finalVerdict || "Your specialist is currently reviewing your records."}
           </Text>
           
@@ -175,7 +175,7 @@ if ( downloadResult && await Sharing.isAvailableAsync()) {
           <Text style={styles.label}>Medical Roadmap</Text>
           <Text style={styles.bodyText}>
             {caseData?.doctorOpinion?.recommendations || "Detailed recommendations will appear here once the review is finalized."}
-          </Text>
+          </Text>*/}
           
           {caseData?.doctorOpinion?.finalVerdict && (
             <View style={styles.buttonGroup}>
@@ -205,12 +205,12 @@ if ( downloadResult && await Sharing.isAvailableAsync()) {
         <View style={styles.aiReferenceCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
             <Ionicons name="analytics-outline" size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
-            <Text style={styles.aiTitle}>AI Preliminary Context</Text>
+            <Text style={styles.cardTitle}>AI Preliminary Context</Text>
           </View>
           
-          <Text style={styles.aiBody}>
+         {/*} <Text style={styles.aiBody}>
             {caseData?.aiAnalysis?.summary || "AI analysis is being generated..."}
-          </Text>
+          </Text>*/}
           
           <View style={styles.aiButtonGroup}>
             <TouchableOpacity onPress={() => handlePreview('ai')}>

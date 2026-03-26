@@ -152,7 +152,7 @@ export default function PatientHomeScreen() {
             onUpdate={fetchState} 
             onFinalSubmit={handleFinalSubmission}
             canUpload={hasPaid} 
-            onRestrictedAccess={() => router.push('/(tabs)/discover' as any)}
+            onRestrictedAccess={() => router.push('/(tabs)/patient/discover' as any)}
           />
         )}
       </View>
