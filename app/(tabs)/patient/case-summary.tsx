@@ -68,12 +68,15 @@ export default function CaseSummary() {
    * 📥 DOWNLOAD & SHARE PDF (Production Ready)
    */
   const handleDownloadPDF = async (type: 'ai' | 'doctor') => {
+    console.log("caseId",caseId)
+    
     if (!caseId) return;
     setDownloading(type);
-
+  
     try {
       const endpoint = type === 'ai' ? 'pdf-ai' : 'pdf-doctor';
       const remoteUrl = patientService.getRecordFileUrl(`case/${endpoint}/${caseId}`);
+      console.log("remote url", remoteUrl );
       const token = await SecureStore.getItemAsync('userToken');
 
       if (!token) {
@@ -95,37 +98,35 @@ export default function CaseSummary() {
         return;
       }
 
-      // --- MOBILE NATIVE LOGIC ---
-      const fs: any = FileSystem;
-      // Defensive check for native modules
-      const baseDir = fs.documentDirectory || fs.cacheDirectory;
-      
-      if (!baseDir) {
-        throw new Error("Local storage is unavailable. If you are on a Dev Build, please ensure you have run 'npx expo run:android' recently to link modules.");
-      }
+      // 1. Get the object
+const directory = FileSystem.Paths.document; 
 
-      const filename = `PramanAI_${type}_${caseId.slice(-6)}.pdf`;
-      const fileUri = baseDir.endsWith('/') ? `${baseDir}${filename}` : `${baseDir}/${filename}`;
+const filename = `PramanAI_${type}_${caseId.slice(-6)}.pdf`;
 
-      // 1. Download the file
-      const downloadResult = await FileSystem.downloadAsync(remoteUrl, fileUri, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+// 2. Extract the string URI from the object 
+// (In most Expo-like wrappers, the string is in .uri or .path)
+const fileObject = directory.createFile(filename, 'application/pdf'  );
 
-      if (downloadResult.status !== 200) {
-        throw new Error("The report could not be generated. Please check back in a few minutes.");
-      }
+// 3. Extract the URI string from the file object
+const fileUri = fileObject.uri;
 
-      // 2. Share/Save (Production standard)
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloadResult.uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: `Praman AI: ${type.toUpperCase()} Report`,
-          UTI: 'com.adobe.pdf',
-        });
-      } else {
-        Alert.alert("Success", "File saved successfully to your device.");
-      }
+console.log("🚀 Prepared File URI:", fileUri);
+
+// 4. Perform the download
+const downloadResult = await FileSystem.File.downloadFileAsync(
+  remoteUrl,
+  fileObject,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+);
+
+// 5. CRITICAL: Share it so it becomes visible in the "Files" app
+if ( downloadResult && await Sharing.isAvailableAsync()) {
+  await Sharing.shareAsync(downloadResult.uri);
+}
     } catch (error: any) {
       console.error("Download error:", error);
       Alert.alert("Notice", error.message || "Could not retrieve the PDF.");

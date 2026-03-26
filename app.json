@@ -45,9 +45,7 @@
         }
       ],
       "expo-file-system",
-      "expo-sharing",
-      "expo-secure-store",
-      "expo-font",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -57,13 +55,23 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      "expo-secure-store",
+      "expo-font",
+      [
+        "react-native-share",
+        {}
+      ],
       [
         "expo-build-properties",
         {
           "android": {
             "minSdkVersion": 21,
+
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
+            "extraAllowlist": [
+              "com.reactnativeshare.ShareFileProvider"
+            ],
             "extraProguardRules": "-keep public class com.horcrux.svg.** { *; }\n-keep class com.facebook.react.bridge.NativeModule { *; }\n-keepattributes *Annotation*\n-keepclassmembers class ** {\n    @org.webkit.JavascriptInterface <methods>;\n}\n-keep class com.razorpay.** {*;}\n-dontwarn com.razorpay.**",
             "packagingOptions": {
               "pickFirst": [

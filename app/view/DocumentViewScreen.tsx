@@ -10,6 +10,7 @@ import * as SecureStore from 'expo-secure-store';
 
 // ✅ Internal Imports
 import { patientService } from '../../services/patientService';
+import { COLORS } from '../../constants/theme';
 
 // ✅ Lazy-load PDF only on Native
 let Pdf: any = null;
@@ -23,28 +24,34 @@ export default function DocumentViewScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // 1. Initialize PDF Library
     if (Platform.OS !== 'web' && !Pdf) {
       try {
         Pdf = require('react-native-pdf').default;
       } catch (e) {
-        console.error("PDF Library load failed");
+        console.error("PDF Library load failed", e);
       }
     }
 
+    // 2. Auth Check
     const fetchToken = async () => {
       try {
         const userToken = await SecureStore.getItemAsync('userToken');
-        setToken(userToken);
+        if (!userToken) {
+          setErrorMsg("Session expired. Please log in.");
+        } else {
+          setToken(userToken);
+        }
       } catch (e) {
         setErrorMsg("Security check failed");
       } finally {
-        setLoading(false);
+        // We don't set loading false here because the PDF/Image component 
+        // will handle its own loading finish state.
       }
     };
     fetchToken();
   }, []);
 
-  // 🟢 IMPROVED FILE DETECTION
   const contentType = params.contentType?.toLowerCase() || '';
   const fileName = params.fileName?.toLowerCase() || '';
 
@@ -54,18 +61,11 @@ export default function DocumentViewScreen() {
                   fileName.endsWith('.png');
 
   const isActuallyPDF = !isImage && (contentType.includes('pdf') || fileName.endsWith('.pdf'));
-
   const fileUrl = patientService.getRecordFileUrl(params.docId);
-
-  if (loading) return (
-    <View style={styles.centered}>
-      <ActivityIndicator size="large" color="#1E7D75" />
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* 🟢 Ensures the status bar doesn't overlap the header on Android */}
+      {/* 🟢 MedTech Clean Status Bar */}
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       
       {/* Header */}
@@ -75,24 +75,31 @@ export default function DocumentViewScreen() {
           style={styles.backButton}
           hitSlop={{top: 20, bottom: 20, left: 20, right: 20}}
         >
-          <Ionicons name="chevron-back" size={28} color="#1E293B" />
+          <Ionicons name="chevron-back" size={24} color="#1E293B" />
         </TouchableOpacity>
         
         <Text style={styles.title} numberOfLines={1}>
           {params.fileName || "Medical Record"}
         </Text>
         
-        {/* Placeholder to keep title centered */}
-        <View style={{ width: 40 }} />
+        <View style={{ width: 40 }} /> 
       </View>
 
       <View style={styles.content}>
+        {/* Full Screen Loader overlay */}
+        {loading && !errorMsg && (
+          <View style={styles.loaderOverlay}>
+            <ActivityIndicator size="large" color={COLORS.primary || '#1E7D75'} />
+            <Text style={styles.loadingText}>Decrypting Document...</Text>
+          </View>
+        )}
+
         {errorMsg ? (
           <View style={styles.centered}>
             <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
             <Text style={styles.errorText}>{errorMsg}</Text>
             <TouchableOpacity onPress={() => router.back()} style={styles.retryBtn}>
-                <Text style={{color: '#FFF'}}>Go Back</Text>
+                <Text style={{color: '#FFF', fontWeight: '600'}}>Go Back</Text>
             </TouchableOpacity>
           </View>
         ) : !token ? (
@@ -105,15 +112,15 @@ export default function DocumentViewScreen() {
               headers: { 'Authorization': `Bearer ${token}` },
               cache: true 
             }}
-            singlePage={false} 
-          onLoadComplete={(numberOfPages: number) => {
-    console.log(`Number of pages: ${numberOfPages}`);
-         setLoading(false);
+            onLoadComplete={() => setLoading(false)}
+            onProgress={(percent: number) => {
+              // Optional: Update loading text with progress
             }}
             style={styles.pdf}
             onError={(error: any) => {
-              console.log("PDF Error Details:", error);
-              setErrorMsg("Could not display PDF.");
+              console.log("PDF Error:", error);
+              setErrorMsg("Unable to open PDF. It may be encrypted or corrupted.");
+              setLoading(false);
             }}
           />
         ) : (
@@ -125,7 +132,10 @@ export default function DocumentViewScreen() {
             style={styles.image} 
             resizeMode="contain"
             onLoadEnd={() => setLoading(false)}
-            onError={() => setErrorMsg("Could not display Image.")}
+            onError={() => {
+              setErrorMsg("Could not display Image.");
+              setLoading(false);
+            }}
           />
         )}
       </View>
@@ -137,27 +147,22 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: '#FFF',
-    // 🟢 FIX: Padding for Android Status Bar
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
   },
   header: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    height: 56,
+    height: 60,
     paddingHorizontal: 15, 
     backgroundColor: '#FFF',
     borderBottomWidth: 1, 
     borderBottomColor: '#F1F5F9',
-    elevation: 2, // Shadow for Android
-    shadowColor: '#000', // Shadow for iOS
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    // Safe area spacing for Android
+    marginTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   backButton: { 
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'flex-start',
   },
   title: { 
     flex: 1, 
@@ -167,6 +172,19 @@ const styles = StyleSheet.create({
     color: '#1E293B' 
   },
   content: { flex: 1, backgroundColor: '#F8FAFC' },
+  loaderOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F8FAFC',
+    zIndex: 10,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500'
+  },
   pdf: { 
     flex: 1, 
     width: Dimensions.get('window').width, 
@@ -174,6 +192,6 @@ const styles = StyleSheet.create({
   },
   image: { width: '100%', height: '100%' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  errorText: { color: '#EF4444', textAlign: 'center', fontWeight: '500', marginTop: 10 },
-  retryBtn: { marginTop: 20, backgroundColor: '#1E293B', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }
+  errorText: { color: '#EF4444', textAlign: 'center', fontWeight: '500', marginTop: 10, lineHeight: 20 },
+  retryBtn: { marginTop: 20, backgroundColor: '#1E293B', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }
 });
