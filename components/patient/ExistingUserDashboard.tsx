@@ -38,6 +38,8 @@ export default function ExistingUserDashboard({
         docId: item._id, 
         fileName: item.fileName || item.title || "Medical Record", 
          contentType: item.contentType,
+         uploadedBy: 'Patient', 
+      category: 'Lab Report'
       }
     });
   };

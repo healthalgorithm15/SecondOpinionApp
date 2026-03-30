@@ -28,7 +28,7 @@
         "foregroundImage": "./assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",
@@ -41,11 +41,11 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#008080"
+          "color": "#1E7D75"
         }
       ],
       "expo-file-system",
-      "expo-dev-client",
+       "expo-dev-client",
       [
         "expo-splash-screen",
         {
@@ -58,20 +58,12 @@
       "expo-secure-store",
       "expo-font",
       [
-        "react-native-share",
-        {}
-      ],
-      [
         "expo-build-properties",
         {
           "android": {
-            "minSdkVersion": 21,
-
+            "minSdkVersion": 23,
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraAllowlist": [
-              "com.reactnativeshare.ShareFileProvider"
-            ],
             "extraProguardRules": "-keep public class com.horcrux.svg.** { *; }\n-keep class com.facebook.react.bridge.NativeModule { *; }\n-keepattributes *Annotation*\n-keepclassmembers class ** {\n    @org.webkit.JavascriptInterface <methods>;\n}\n-keep class com.razorpay.** {*;}\n-dontwarn com.razorpay.**",
             "packagingOptions": {
               "pickFirst": [
