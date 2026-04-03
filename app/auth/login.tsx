@@ -22,17 +22,20 @@ import { COLORS, BORDER_RADIUS, TYPOGRAPHY } from '../../constants/theme';
 import { authService } from '@/services/authService';
 
 export default function Login() {
+
   const router = useRouter();
+
   
   // State
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [renderKey, setRenderKey] = useState(0);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     identifier: '',
     password: ''
   });
-
+  console.log("🛠️ LOGIN COMPONENT RENDERED (State is:", errorMsg, ")");
   // Local Validation Logic
   const validateForm = () => {
     const { identifier, password } = formData;
@@ -48,7 +51,7 @@ export default function Login() {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(trimmedId)) return "Please enter a valid email address.";
     } else if (isNumeric) {
-      if (trimmedId.length < 10 || trimmedId.length > 15) return "Mobile number must be 10-15 digits.";
+      if (trimmedId.length < 10) return "Please enter a valid mobile number.";
     }
 
     if (password.length < 8) return "Password must be at least 8 characters long.";
@@ -58,42 +61,62 @@ export default function Login() {
 
   /**
    * handleLogin
-   * Updated with strict status guards to prevent unauthorized navigation
+   * Syncs with Backend statuses: 401 (Wrong creds), 403 (Unverified), 404 (Not found)
    */
- const handleLogin = async () => {
+ /**
+ * handleLogin
+ * Production-ready implementation with robust error handling
+ */
+const handleLogin = async () => {
+  // 1. Reset UI state immediately
   setErrorMsg(null);
   const validationError = validateForm();
-  if (validationError) return setErrorMsg(validationError);
+  if (validationError) {
+    setErrorMsg(validationError);
+    return;
+  }
 
   setLoading(true);
-
+  
   try {
-    const res = await authService.login(formData.identifier.trim(), formData.password);
+    const res = await authService.login(
+      formData.identifier.trim(), 
+      formData.password
+    );
     
-    // ✅ ONLY navigate here if the request was successful
-    if (res.success || res.token) {
+    if (res.success || res.message === 'OTP sent') {
       router.push({
         pathname: '/auth/otp' as any,
         params: { identifier: formData.identifier.trim(), mode: 'login' }
       });
+      return; 
     }
   } catch (error: any) {
     const status = error.response?.status;
-    const message = error.response?.data?.message || "";
+    const serverMsg = error.response?.data?.message;
 
-    // 🛑 If backend says "User found in DB: NO", it returns a 401 or 404
+    let errorToDisplay = "Connection error. Please try again.";
     if (status === 401 || status === 404) {
-      setErrorMsg("Invalid email/mobile or password.");
+      errorToDisplay = "Invalid email/mobile or password.";
     } else if (status === 403) {
-      setErrorMsg(message || "Please verify your account first.");
-    } else {
-      setErrorMsg("An unexpected error occurred. Please try again.");
+      errorToDisplay = serverMsg || "Account not verified.";
+    } else if (serverMsg) {
+      errorToDisplay = serverMsg;
     }
+
+    console.log("❌ Catch Block Caught:", errorToDisplay);
+
+    // 🟢 ATOMIC UPDATE: We set everything at once to prevent race conditions
+    // We do NOT use setTimeout here anymore; we want it to hit in the same render cycle
+    setErrorMsg(errorToDisplay);
+    setRenderKey(prev => prev + 1);
+    
   } finally {
+    // 🟢 FINALLY: Stop loading after the error has been caught
     setLoading(false);
   }
 };
-
+console.log("Current Component State:", errorMsg);
   return (
     <AuthLayout
       title={STRINGS.common.login}
@@ -108,22 +131,22 @@ export default function Login() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Glass Form Card */}
-          <View style={styles.glassCard}>
-            
+          <View key={renderKey} style={styles.glassCard}>
+            <Text>hello {errorMsg}</Text>
             {errorMsg && (
               <View style={styles.errorBox}>
                 <Ionicons name="alert-circle" size={18} color="#ef4444" />
-                <Text style={styles.errorText}>{errorMsg}</Text>
+                <Text style={styles.errorText}>yyy{errorMsg}</Text>
               </View>
             )}
 
             <Text style={styles.label}>Email or Mobile Number</Text>
             <TextInput
               style={styles.input}
-              placeholder="name@emmmmmail.com or 9876543210"
+              placeholder="e.g., name@email.com"
               placeholderTextColor="rgba(15, 23, 42, 0.4)"
               autoCapitalize="none"
+              keyboardType="email-address"
               value={formData.identifier}
               onChangeText={(val) => setFormData(prev => ({ ...prev, identifier: val }))}
             />
@@ -173,10 +196,10 @@ export default function Login() {
           </View>
 
           <View style={styles.disclaimerContainer}>
-             <Text style={styles.disclaimerText}>
-               Your medical data is encrypted with enterprise-grade security. 
-               We prioritize your privacy and confidentiality.
-             </Text>
+              <Text style={styles.disclaimerText}>
+                Your medical data is encrypted with enterprise-grade security. 
+                We prioritize your privacy and confidentiality.
+              </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -190,7 +213,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, 
     paddingBottom: 40, 
     flexGrow: 1, 
-    justifyContent: 'center' 
+    paddingTop: 12,
+   justifyContent: 'center' 
   },
   glassCard: {
     backgroundColor: 'rgba(255, 255, 255, 0.92)',
@@ -212,6 +236,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     marginBottom: 20,
     gap: 8,
+    zIndex: 100,
     borderWidth: 1,
     borderColor: '#fee2e2'
   } as ViewStyle,

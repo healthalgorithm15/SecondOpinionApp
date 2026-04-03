@@ -12,7 +12,6 @@ export const authService = {
       password: password
     };
     try {
-
       const response = await API.post('/auth/register', payload);
       return response.data;
     } catch (error: any) {
@@ -162,6 +161,7 @@ export const authService = {
     }
   },
 
+  // 11. UPDATE PROFILE
   updateProfile: async (data: { pushToken?: string; name?: string }) => {
     try {
       // Hits router.patch('/profile', protect, authController.updateProfile)

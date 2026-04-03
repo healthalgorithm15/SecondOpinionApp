@@ -33,7 +33,7 @@ export default function Signup() {
     password: '' 
   });
 
-  // 🟢 LOGIC UNTOUCHED: STRICT VALIDATION
+  // 🛡️ VALIDATION LOGIC
   const validateSignup = () => {
     const { name, email, mobile, password } = formData;
     
@@ -46,27 +46,27 @@ export default function Signup() {
     if (email.trim().length > 0) {
       const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
       if (!emailRegex.test(email.trim())) {
-        return "The email format is invalid (e.g., name@domain.com).";
+        return "The email format is invalid.";
       }
     }
 
     if (mobile.trim().length > 0) {
       const numericMobile = mobile.replace(/\D/g, ''); 
       if (numericMobile.length !== 10) {
-        return "Mobile number must be exactly 10 digits.";
+        return "Mobile number must be 10 digits.";
       }
     }
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
     if (!password) return "Password is required.";
     if (!passwordRegex.test(password)) {
-      return "Password must be at least 8 characters long and include an uppercase letter, a number, and a special character.";
+      return "Password needs an uppercase, number, and special character (min 8 chars).";
     }
 
     return null; 
   };
 
-  // 🟢 LOGIC UNTOUCHED: REGISTRATION HANDLER
+  // 🚀 REGISTRATION HANDLER
   const handleRegister = async () => {
     setErrorMsg(null);
     
@@ -78,8 +78,15 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      await authService.register(formData.name, formData.email, formData.mobile, formData.password);
+      // Calling the restored authService
+      const response = await authService.register(
+        formData.name, 
+        formData.email, 
+        formData.mobile, 
+        formData.password
+      );
       
+      // Navigate based on which identifier was provided
       if (formData.mobile.trim()) {
         router.push({ 
           pathname: '/auth/otp' as any, 
@@ -92,14 +99,10 @@ export default function Signup() {
         });
       }
     } catch (error: any) {
-      const debugMessage = `
-    Err: ${error.message} 
-    URL: ${error.config?.url} 
-    Status: ${error.response?.status}
-  `;
-  setErrorMsg(debugMessage);
-  console.log("Full Error Object:", error);
-      //setErrorMsg(error.response?.data?.message || "Registration failed. Please try again.");
+      // Production Error Handling: Capture backend message
+      const message = error.response?.data?.message || "Registration failed. Please try again.";
+      setErrorMsg(message);
+      console.error("Signup Error:", error);
     } finally {
       setLoading(false);
     }
@@ -117,7 +120,7 @@ export default function Signup() {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.glassCard}>
+          <View style={[styles.glassCard, { marginTop: 40 }]}>
             {errorMsg && (
               <View style={styles.errorBox}>
                 <Ionicons name="alert-circle" size={16} color="#ef4444" />
@@ -152,7 +155,7 @@ export default function Signup() {
             </View>
             <TextInput 
               style={styles.input} 
-              placeholder="+91 00000 00000" 
+              placeholder="10-digit number" 
               keyboardType="phone-pad"
               maxLength={10}
               placeholderTextColor="rgba(15, 23, 42, 0.4)"
@@ -210,18 +213,18 @@ const styles = StyleSheet.create({
   flexContainer: { flex: 1 },
   scrollContent: { 
     paddingHorizontal: 20, 
-    paddingBottom: 100, // 🟢 FIX: Provides room for footer without clipping
-    paddingTop: 8 
+    paddingBottom: 100, 
+    
   },
   glassCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.69)', 
+    backgroundColor: 'rgba(255, 255, 255, 0.85)', 
     borderRadius: 28,
     padding: 24,
     borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.7)',
+     borderColor: 'rgba(255, 255, 255, 0.7)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.1,
     shadowRadius: 18,
     elevation: 10,
   } as ViewStyle,
@@ -249,7 +252,7 @@ const styles = StyleSheet.create({
   googleText: { fontSize: 15, fontWeight: '600', color: '#475569' },
   errorBox: { 
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef2f2', 
-    padding: 10, borderRadius: 12, marginBottom: 16, gap: 8 
+    padding: 12, borderRadius: 12, marginBottom: 16, gap: 8 
   } as ViewStyle,
   errorText: { color: '#ef4444', fontSize: 13, fontWeight: '600', flex: 1 },
   footerContainer: {
@@ -257,5 +260,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   } as ViewStyle,
   footerLink: { color: '#FFFFFF', fontSize: 15 } as TextStyle,
-  footerBold: { color: '#2b146b', fontWeight: '800', textDecorationLine: 'underline' },
+  footerBold: { color: '#ffffff', fontWeight: '800', textDecorationLine: 'underline' },
 });

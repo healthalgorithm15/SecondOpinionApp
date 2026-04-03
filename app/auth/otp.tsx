@@ -8,11 +8,14 @@ import {
   Platform, 
   ScrollView, 
   TouchableOpacity,
+  Alert,
   TextStyle,
   ViewStyle 
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons'; 
+
+// 🟢 Core Infrastructure
 import AuthLayout from '../../components/AuthLayout';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { COLORS } from '../../constants/theme';
@@ -20,45 +23,45 @@ import { authService } from '@/services/authService';
 import { storage } from '@/utils/storage'; 
 import API from '@/utils/api'; 
 
-// 🟢 Services for Real-time & Notifications
+// 🟢 Real-time & Notification Services
 import { socketService } from '@/services/socketService';
 import { registerForPushNotificationsAsync } from '@/hooks/useNotifications';
 
 export default function OtpVerificationScreen() {
   const { identifier, mode } = useLocalSearchParams<{ identifier: string; mode: string }>();
   const router = useRouter();
+  
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   /**
-   * handleVerifyOtp
-   * Verifies the 2FA code and initializes background services
+   * 🛡️ handleVerifyOtp
+   * Finalizes the auth flow and prepares the app state
    */
   const handleVerifyOtp = async () => {
     if (otp.length < 4) return setErrorMsg("Please enter the verification code.");
+    
     setLoading(true);
     setErrorMsg(null);
 
-    const verificationMode = (mode || 'login') as 'login' | 'reset';
+    // Normalize mode for the authService
+    const verificationMode = (mode === 'reset' ? 'reset' : 'login');
 
     try {
-      // 1. Verify OTP with Backend
+      // 1. Verify with Backend
       const response = await authService.verifyOTP(identifier, otp, verificationMode);
       
-      if (!response?.data) {
-        throw new Error("Invalid response from server");
-      }
+      if (!response?.data) throw new Error("Invalid response from server");
 
       const { user, token } = response.data;
 
-      // 2. Persist Auth Session & Set Headers
+      // 2. ⚡ SESSION PERSISTENCE (High Priority)
       if (token) {
-        // ⚡ CRITICAL: Set header in memory FIRST. 
-        // This ensures the very next API call (Payment/Socket) has the token.
+        // Set header IMMEDIATELY to prevent 401s on next immediate app calls
         API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-        // Save to local storage in parallel for speed
+        // Store user metadata in parallel
         await Promise.all([
           storage.setItem('userToken', token),
           storage.setItem('userId', user._id || ''),
@@ -69,31 +72,34 @@ export default function OtpVerificationScreen() {
         ]);
       }
 
-      // 3. Initialize Background Services
-      // We pass the token directly to the socket to bypass storage latency
-      if (token) {
+      // 3. 🔄 BACKGROUND SERVICES INIT
+      if (token && verificationMode === 'login') {
         try {
-          // Attempting background initialization
+          // Connect socket with raw token to bypass storage read latency
           await socketService.connect(token);
-          // Only register push notifications if we are in login mode
-          if (verificationMode === 'login') {
-            await registerForPushNotificationsAsync();
+          
+          // Register for push notifications for medical updates
+          const pushToken = await registerForPushNotificationsAsync();
+          if (pushToken) {
+            await authService.updateProfile({ pushToken });
           }
         } catch (srvErr) {
-          console.warn("Background services init warning:", srvErr);
+          console.warn("Non-critical service init failure:", srvErr);
         }
       }
 
-      // 4. ROLE-BASED NAVIGATION
+      // 4. 🚀 ROLE-BASED ROUTING
       if (user && user.role) {
         const role = user.role.toLowerCase();
         
-        // Small delay ensures state and storage are fully flushed
+        // Small delay to ensure storage flush on low-end devices
         setTimeout(() => {
+          // Check for Doctor Activation Requirement
           if (role === 'doctor' && user.isFirstLogin) {
             return router.replace('/auth/doctor-activation');
           }
 
+          // Main Navigation Switch
           switch (role) {
             case 'admin':
               router.replace('/(tabs)/admin-home');
@@ -102,8 +108,6 @@ export default function OtpVerificationScreen() {
               router.replace('/(tabs)/doctor/doctor-home');
               break;
             case 'patient':
-              // 🟢 SUCCESS: Navigate specifically to the nested discover route
-              // This helps resolve the "Home" vs "Discover" icon highlight issue
               router.replace('/(tabs)/patient/discover');
               break;
             default:
@@ -112,11 +116,11 @@ export default function OtpVerificationScreen() {
           }
         }, 300); 
       } else {
-        setErrorMsg("User data missing. Please try logging in again.");
+        setErrorMsg("Profile data missing. Please log in again.");
       }
 
     } catch (error: any) {
-      console.error("❌ OTP Verification Error:", error);
+      console.error("❌ OTP Error:", error);
       const backendMessage = error.response?.data?.message;
       setErrorMsg(backendMessage || "Invalid or expired OTP");
     } finally {
@@ -124,8 +128,21 @@ export default function OtpVerificationScreen() {
     }
   };
 
+  /**
+   * 🔄 handleResend
+   * Triggers a new OTP and provides UI feedback
+   */
+  const handleResend = async () => {
+    try {
+      await authService.resendOTP(identifier);
+      Alert.alert("Code Sent", "A new verification code has been sent.");
+    } catch (error: any) {
+      setErrorMsg("Failed to resend code. Please wait a moment.");
+    }
+  };
+
   return (
-    <AuthLayout title="Enter Code" subtitle={`We've sent a code to ${identifier}`}>
+    <AuthLayout title="Enter Code" subtitle={`We've sent a 6-digit code to ${identifier}`}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={styles.flexContainer}
@@ -165,10 +182,7 @@ export default function OtpVerificationScreen() {
 
             <View style={styles.resendContainer}>
               <Text style={styles.resendText}>Didn't receive the code?</Text>
-              <TouchableOpacity 
-                activeOpacity={0.7}
-                onPress={() => authService.resendOTP(identifier)}
-              >
+              <TouchableOpacity activeOpacity={0.7} onPress={handleResend}>
                 <Text style={styles.resendLink}>Resend Code</Text>
               </TouchableOpacity>
             </View>
@@ -184,29 +198,28 @@ const styles = StyleSheet.create({
   scrollContent: { 
     flexGrow: 1,
     paddingHorizontal: 20,
-    justifyContent: 'flex-start', 
+    justifyContent: 'center', 
     paddingBottom: 40,
   },
   glassCard: {
-    marginTop: 10, 
-    backgroundColor: 'rgba(255, 255, 255, 0.97)', 
+    backgroundColor: 'rgba(255, 255, 255, 0.95)', 
     borderRadius: 28,
     padding: 24,
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.7)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.08,
     shadowRadius: 18,
     elevation: 10,
-    width: '100%',
   } as ViewStyle,
   fieldLabel: { 
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700', 
     color: '#1e293b', 
     marginBottom: 16, 
-    textAlign: 'center' 
+    textAlign: 'center',
+    textTransform: 'uppercase'
   } as TextStyle,
   otpInput: { 
     backgroundColor: '#F8FAFC', 
@@ -214,15 +227,14 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0', 
     borderRadius: 16, 
     padding: 16, 
-    fontSize: 32, 
+    fontSize: 28, 
     fontWeight: '800', 
     textAlign: 'center', 
-    letterSpacing: 12, 
+    letterSpacing: 8, 
     marginBottom: 24, 
-    width: '100%', 
     color: '#1E5D57' 
   } as TextStyle,
-  submitBtn: { width: '100%', marginTop: 10, borderRadius: 16 },
+  submitBtn: { width: '100%', borderRadius: 16 },
   errorBox: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -236,11 +248,11 @@ const styles = StyleSheet.create({
   } as ViewStyle,
   errorText: { color: '#ef4444', fontSize: 13, fontWeight: '600', flex: 1 },
   resendContainer: { marginTop: 28, alignItems: 'center' } as ViewStyle,
-  resendText: { color: '#475569', fontSize: 14, marginBottom: 6 } as TextStyle,
+  resendText: { color: '#64748b', fontSize: 14, marginBottom: 4 } as TextStyle,
   resendLink: { 
     color: '#1E5D57', 
     fontWeight: '800', 
-    fontSize: 16,
+    fontSize: 15,
     textDecorationLine: 'underline'
   } as TextStyle,
 });
