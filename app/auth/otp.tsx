@@ -53,6 +53,13 @@ export default function OtpVerificationScreen() {
       const response = await authService.verifyOTP(identifier, otp, verificationMode);
       
       if (!response?.data) throw new Error("Invalid response from server");
+      if (verificationMode === 'reset') {
+        setLoading(false);
+        return router.push({
+          pathname: '/auth/reset-password', // Make sure this file exists!
+          params: { identifier, otp } // Pass these so the next screen can use them
+        });
+      }
 
       const { user, token } = response.data;
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ImageBackground, ScrollView, SafeAreaView, Platform, Dimensions } from 'react-native';
 import { STRINGS } from '../constants/Strings';
 import { COLORS, TYPOGRAPHY } from '@/constants/theme';
+import { KeyboardAvoidingView } from 'react-native';
 
 const { height } = Dimensions.get('window');
 
@@ -26,6 +27,10 @@ export default function AuthLayout({
         resizeMode="cover" 
       >
         <SafeAreaView style={styles.safeArea}>
+          <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      style={{ flex: 1 }}
+    >
           <ScrollView 
             // 🟢 3. Pass the prop to the ScrollView
             scrollEnabled={scrollEnabled}
@@ -52,6 +57,7 @@ export default function AuthLayout({
               {children}
             </View>
           </ScrollView>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </ImageBackground>
     </View>

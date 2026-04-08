@@ -13,6 +13,7 @@ export const authService = {
     };
     try {
       const response = await API.post('/auth/register', payload);
+      console.log("response date", response.data)
       return response.data;
     } catch (error: any) {
       console.error("❌ Registration Error:", error.response?.data || error.message);
