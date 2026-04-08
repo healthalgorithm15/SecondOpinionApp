@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -35,9 +35,27 @@ export default function OtpVerificationScreen() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // 🛡️ Rate Limiting States
+  const [timer, setTimer] = useState(60); 
+  const [canResend, setCanResend] = useState(false);
+
+  /**
+   * ⏲️ Countdown Timer Effect
+   */
+  useEffect(() => {
+    let interval: any;
+    if (timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    } else {
+      setCanResend(true);
+    }
+    return () => clearInterval(interval);
+  }, [timer]);
+
   /**
    * 🛡️ handleVerifyOtp
-   * Finalizes the auth flow and prepares the app state
    */
   const handleVerifyOtp = async () => {
     if (otp.length < 4) return setErrorMsg("Please enter the verification code.");
@@ -45,30 +63,25 @@ export default function OtpVerificationScreen() {
     setLoading(true);
     setErrorMsg(null);
 
-    // Normalize mode for the authService
     const verificationMode = (mode === 'reset' ? 'reset' : 'login');
 
     try {
-      // 1. Verify with Backend
       const response = await authService.verifyOTP(identifier, otp, verificationMode);
       
       if (!response?.data) throw new Error("Invalid response from server");
+      
       if (verificationMode === 'reset') {
         setLoading(false);
         return router.push({
-          pathname: '/auth/reset-password', // Make sure this file exists!
-          params: { identifier, otp } // Pass these so the next screen can use them
+          pathname: '/auth/reset-password',
+          params: { identifier, otp }
         });
       }
 
       const { user, token } = response.data;
 
-      // 2. ⚡ SESSION PERSISTENCE (High Priority)
       if (token) {
-        // Set header IMMEDIATELY to prevent 401s on next immediate app calls
         API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-        // Store user metadata in parallel
         await Promise.all([
           storage.setItem('userToken', token),
           storage.setItem('userId', user._id || ''),
@@ -79,55 +92,33 @@ export default function OtpVerificationScreen() {
         ]);
       }
 
-      // 3. 🔄 BACKGROUND SERVICES INIT
       if (token && verificationMode === 'login') {
         try {
-          // Connect socket with raw token to bypass storage read latency
           await socketService.connect(token);
-          
-          // Register for push notifications for medical updates
           const pushToken = await registerForPushNotificationsAsync();
-          if (pushToken) {
-            await authService.updateProfile({ pushToken });
-          }
+          if (pushToken) await authService.updateProfile({ pushToken });
         } catch (srvErr) {
           console.warn("Non-critical service init failure:", srvErr);
         }
       }
 
-      // 4. 🚀 ROLE-BASED ROUTING
       if (user && user.role) {
         const role = user.role.toLowerCase();
-        
-        // Small delay to ensure storage flush on low-end devices
         setTimeout(() => {
-          // Check for Doctor Activation Requirement
           if (role === 'doctor' && user.isFirstLogin) {
             return router.replace('/auth/doctor-activation');
           }
-
-          // Main Navigation Switch
           switch (role) {
-            case 'admin':
-              router.replace('/(tabs)/admin-home');
-              break;
-            case 'doctor':
-              router.replace('/(tabs)/doctor/doctor-home');
-              break;
-            case 'patient':
-              router.replace('/(tabs)/patient/discover');
-              break;
-            default:
-              router.replace('/auth/login');
-              break;
+            case 'admin': router.replace('/(tabs)/admin-home'); break;
+            case 'doctor': router.replace('/(tabs)/doctor/doctor-home'); break;
+            case 'patient': router.replace('/(tabs)/patient/discover'); break;
+            default: router.replace('/auth/login'); break;
           }
         }, 300); 
       } else {
         setErrorMsg("Profile data missing. Please log in again.");
       }
-
     } catch (error: any) {
-      console.error("❌ OTP Error:", error);
       const backendMessage = error.response?.data?.message;
       setErrorMsg(backendMessage || "Invalid or expired OTP");
     } finally {
@@ -137,14 +128,24 @@ export default function OtpVerificationScreen() {
 
   /**
    * 🔄 handleResend
-   * Triggers a new OTP and provides UI feedback
    */
   const handleResend = async () => {
+    if (!canResend) return; // Guard clause
+
     try {
+      setLoading(true);
       await authService.resendOTP(identifier);
+      
+      // Reset local timer
+      setTimer(60);
+      setCanResend(false);
+      
       Alert.alert("Code Sent", "A new verification code has been sent.");
     } catch (error: any) {
-      setErrorMsg("Failed to resend code. Please wait a moment.");
+      const msg = error.response?.data?.message || "Failed to resend code.";
+      setErrorMsg(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -189,8 +190,17 @@ export default function OtpVerificationScreen() {
 
             <View style={styles.resendContainer}>
               <Text style={styles.resendText}>Didn't receive the code?</Text>
-              <TouchableOpacity activeOpacity={0.7} onPress={handleResend}>
-                <Text style={styles.resendLink}>Resend Code</Text>
+              <TouchableOpacity 
+                activeOpacity={0.7} 
+                onPress={handleResend}
+                disabled={!canResend}
+              >
+                <Text style={[
+                  styles.resendLink, 
+                  !canResend && { color: COLORS.textSub, textDecorationLine: 'none' }
+                ]}>
+                  {canResend ? "Resend Code" : `Resend in ${timer}s`}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

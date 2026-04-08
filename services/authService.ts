@@ -113,9 +113,10 @@ export const authService = {
   },
 
   // 7. RESEND OTP
+ // 7. RESEND OTP (Point to the new dedicated endpoint)
   resendOTP: async (identifier: string) => {
     try {
-      const response = await API.post('/auth/forgot-password', { 
+      const response = await API.post('/auth/resend-otp', { 
         identifier: identifier.trim() 
       });
       return response.data;

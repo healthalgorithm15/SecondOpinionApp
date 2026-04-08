@@ -1,6 +1,19 @@
 import React, { useState } from 'react';
-import { StyleSheet, TextInput, Alert, View, Text, Platform } from 'react-native';
+import { 
+  StyleSheet, 
+  TextInput, 
+  Alert, 
+  View, 
+  Text, 
+  Platform, 
+  TouchableOpacity,
+  ViewStyle,
+  TextStyle
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+
+// 🟢 Infrastructure & Theme
 import AuthLayout from '../../components/AuthLayout';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { COLORS, BORDER_RADIUS } from '../../constants/theme';
@@ -13,37 +26,42 @@ export default function ResetPasswordScreen() {
 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleReset = async () => {
-    if (newPassword.length < 8) {
-      return Alert.alert("Error", STRINGS.validation.passwordShort);
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#])[A-Za-z\d@$!%*?&#]{8,}$/;
+
+    if (!newPassword) {
+      return Alert.alert("Error", "Please enter a new password.");
     }
+
+    if (!passwordRegex.test(newPassword)) {
+      return Alert.alert(
+        "Security Requirement",
+        "Password needs an uppercase letter, a number, and a special character (min 8 chars)."
+      );
+    }
+
     if (newPassword !== confirmPassword) {
-      return Alert.alert("Error", "Passwords do not match");
+      return Alert.alert("Error", "Passwords do not match.");
     }
 
     setLoading(true);
     try {
       await authService.resetPassword(identifier, otp, newPassword);
       
-      // 🌐 Web Handling
+      const successMsg = STRINGS.auth.resetSuccess || "Password reset successfully!";
+
       if (Platform.OS === 'web') {
-        window.alert(STRINGS.auth.resetSuccess || "Password reset successfully!");
+        window.alert(successMsg);
         router.replace('/auth/login');
-      } 
-      // 📱 Mobile Handling
-      else {
+      } else {
         Alert.alert(
           "Success", 
-          STRINGS.auth.resetSuccess || "Password reset successfully!", 
-          [
-            { 
-              text: "Login", 
-              onPress: () => router.replace('/auth/login') 
-            }
-          ],
-          { cancelable: false } // 🛡️ Prevents user from dismissing without clicking "Login"
+          successMsg, 
+          [{ text: "Login", onPress: () => router.replace('/auth/login') }],
+          { cancelable: false }
         );
       }
     } catch (error: any) {
@@ -56,25 +74,52 @@ export default function ResetPasswordScreen() {
   return (
     <AuthLayout title="Reset Password" subtitle="Enter your new secure password.">
       <View style={styles.form}>
-        <Text style={styles.label}>{STRINGS.auth.password}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          secureTextEntry
-          value={newPassword}
-          onChangeText={setNewPassword}
-          placeholderTextColor={COLORS.textSub}
-        />
         
+        {/* New Password Field */}
+        <Text style={styles.label}>{STRINGS.auth.password}</Text>
+        <View style={styles.passwordWrapper}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="••••••••"
+            secureTextEntry={!showPassword}
+            value={newPassword}
+            onChangeText={setNewPassword}
+            placeholderTextColor={COLORS.textSub}
+          />
+          <TouchableOpacity 
+            onPress={() => setShowPassword(!showPassword)} 
+            style={styles.eyeIcon}
+          >
+            <Ionicons 
+              name={showPassword ? "eye-off-outline" : "eye-outline"} 
+              size={20} 
+              color={COLORS.textSub} 
+            />
+          </TouchableOpacity>
+        </View>
+        
+        {/* Confirm Password Field (Now with Eye Toggle) */}
         <Text style={[styles.label, { marginTop: 15 }]}>{STRINGS.auth.confirmPassword}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="••••••••"
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          placeholderTextColor={COLORS.textSub}
-        />
+        <View style={styles.passwordWrapper}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="••••••••"
+            secureTextEntry={!showPassword}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            placeholderTextColor={COLORS.textSub}
+          />
+          <TouchableOpacity 
+            onPress={() => setShowPassword(!showPassword)} 
+            style={styles.eyeIcon}
+          >
+            <Ionicons 
+              name={showPassword ? "eye-off-outline" : "eye-outline"} 
+              size={20} 
+              color={COLORS.textSub} 
+            />
+          </TouchableOpacity>
+        </View>
 
         <PrimaryButton 
           title={STRINGS.common.continue} 
@@ -89,14 +134,29 @@ export default function ResetPasswordScreen() {
 
 const styles = StyleSheet.create({
   form: { width: '100%', marginTop: 10 },
-  label: { fontSize: 14, color: COLORS.textMain, marginBottom: 8, fontWeight: '600' },
-  input: { 
-    height: 50, 
-    backgroundColor: COLORS.white, 
-    borderWidth: 1, 
-    borderColor: COLORS.border, 
-    borderRadius: BORDER_RADIUS.md, 
+  label: { 
+    fontSize: 14, 
+    color: COLORS.textMain, 
+    marginBottom: 8, 
+    fontWeight: '600' 
+  } as TextStyle,
+  passwordWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: BORDER_RADIUS.md,
+    height: 50,
+    marginBottom: 5, // Added slight spacing
+  } as ViewStyle,
+  passwordInput: { 
+    flex: 1,
     paddingHorizontal: 15,
-    color: COLORS.textMain
-  }
+    color: COLORS.textMain,
+    fontSize: 16,
+  } as TextStyle,
+  eyeIcon: { 
+    paddingHorizontal: 15,
+  } as ViewStyle,
 });
