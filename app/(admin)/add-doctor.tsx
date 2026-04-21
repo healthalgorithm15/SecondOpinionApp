@@ -10,13 +10,13 @@ export default function AddDoctorPage() {
     <View style={styles.screenWrapper}>
       <AuthLayout 
         title={STRINGS.admin.registerDoctor.replace('+ ', '')} 
-        subtitle={STRINGS.admin.subtitle}
+        subtitle="Register a verified medical professional"
       >
         <ScrollView 
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {/* ⚪ THE GLASS CARD CONTAINER */}
           <View style={styles.glassCard}>
             <AddDoctorForm />
           </View>
@@ -27,15 +27,8 @@ export default function AddDoctorPage() {
 }
 
 const styles = StyleSheet.create({
-  screenWrapper: { 
-    flex: 1, 
-    backgroundColor: COLORS.bgScreen 
-  },
-  scrollContent: {
-    paddingBottom: 40,
-    alignItems: 'center',
-    width: '100%'
-  },
+  screenWrapper: { flex: 1, backgroundColor: COLORS.bgScreen },
+  scrollContent: { paddingBottom: 40, alignItems: 'center', width: '100%' },
   glassCard: {
     width: '94%',
     backgroundColor: COLORS.glassBg,
@@ -44,7 +37,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.glassBorder,
     marginTop: 10,
-    // Matching the shadow depth of the Admin Dashboard stats
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },

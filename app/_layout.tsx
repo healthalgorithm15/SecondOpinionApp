@@ -94,6 +94,15 @@ export default function RootLayout() {
         <Stack.Screen name="auth/otp" />
         <Stack.Screen name="auth/doctor-activation" />
 
+        {/* 🛡️ Admin Application */}
+        <Stack.Screen 
+          name="(admin)" 
+          options={{ 
+            gestureEnabled: false,
+            animation: 'fade'
+          }} 
+        />
+
         {/* Tab Application */}
         <Stack.Screen 
           name="(tabs)" 
