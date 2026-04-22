@@ -18,7 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 // 🟢 Core Infrastructure
 import AuthLayout from '../../components/AuthLayout';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
-import { COLORS } from '../../constants/theme';
+import { COLORS, BORDER_RADIUS } from '../../constants/theme';
 import { authService } from '@/services/authService';
 import { storage } from '@/utils/storage'; 
 import API from '@/utils/api'; 
@@ -80,6 +80,7 @@ export default function OtpVerificationScreen() {
 
       const { user, token } = response.data;
 
+      // 🟢 AUTH PERSISTENCE
       if (token) {
         API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
         await Promise.all([
@@ -89,9 +90,11 @@ export default function OtpVerificationScreen() {
           storage.setItem('userEmail', user.email || ''),
           storage.setItem('userPhone', user.mobile || ''),
           storage.setItem('userRole', user.role.toLowerCase()),
+          storage.setItem('isFirstLogin', String(user.isFirstLogin)), // Store for guard logic
         ]);
       }
 
+      // 🟢 SERVICE INITIALIZATION
       if (token && verificationMode === 'login') {
         try {
           await socketService.connect(token);
@@ -102,18 +105,40 @@ export default function OtpVerificationScreen() {
         }
       }
 
+      // 🟢 DYNAMIC ROUTING ENGINE
       if (user && user.role) {
         const role = user.role.toLowerCase();
+        
         setTimeout(() => {
-          if (role === 'doctor' && user.isFirstLogin) {
-            return router.replace('/auth/doctor-activation');
+          // 1. Check for Mandatory Password Change (Doctors & CMOs)
+          if ((role === 'doctor' || role === 'cmo') && user.isFirstLogin) {
+            return router.replace({
+              pathname: '/auth/doctor-activation',
+              params: { userId: user._id, email: user.email }
+            });
           }
-          switch (role) {
-            case 'admin': router.replace('/(tabs)/admin-home'); break;
-            case 'doctor': router.replace('/(tabs)/doctor/doctor-home'); break;
-            case 'patient': router.replace('/(tabs)/patient/discover'); break;
-            default: router.replace('/auth/login'); break;
-          }
+
+          // 2. Role-Based Dashboard Redirection
+       // Inside handleVerifyOtp, within the role-based switch
+switch (role) {
+  case 'admin': 
+    router.replace('/(admin)/' as any); 
+    break;
+    
+  case 'doctor': 
+  case 'cmo': 
+    // 🟢 Both roles now point to the shared file in your existing structure
+    router.replace('/(tabs)/doctor/doctor-home' as any); 
+    break;
+    
+  case 'patient': 
+    router.replace('/(tabs)/patient/discover' as any); 
+    break;
+    
+  default: 
+    router.replace('/auth/login' as any); 
+    break;
+}
         }, 300); 
       } else {
         setErrorMsg("Profile data missing. Please log in again.");
@@ -130,13 +155,12 @@ export default function OtpVerificationScreen() {
    * 🔄 handleResend
    */
   const handleResend = async () => {
-    if (!canResend) return; // Guard clause
+    if (!canResend) return;
 
     try {
       setLoading(true);
       await authService.resendOTP(identifier);
       
-      // Reset local timer
       setTimer(60);
       setCanResend(false);
       
@@ -197,7 +221,7 @@ export default function OtpVerificationScreen() {
               >
                 <Text style={[
                   styles.resendLink, 
-                  !canResend && { color: COLORS.textSub, textDecorationLine: 'none' }
+                  !canResend && { color: '#94a3b8', textDecorationLine: 'none' }
                 ]}>
                   {canResend ? "Resend Code" : `Resend in ${timer}s`}
                 </Text>

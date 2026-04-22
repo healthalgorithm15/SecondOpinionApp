@@ -3,12 +3,13 @@ import api from '../utils/api';
 // --- Interfaces for Type Safety ---
 
 export interface DoctorRegistrationData {
-    name: string;
-    email: string;
-    mobile: string;
-    specialization: string;
-    mciNumber: string;
-    experienceYears?: number;
+  name: string;
+  email: string;
+  mobile: string;
+  role: 'doctor' | 'cmo'; // 🟢 Now mandatory for the service call
+  specialization?: string;
+  mciNumber?: string;
+  experienceYears?: number;
 }
 
 export interface AdminResponse<T = any> {
@@ -17,11 +18,28 @@ export interface AdminResponse<T = any> {
     data?: T;
 }
 
-// Concrete data shapes for better frontend development
 export interface DashboardStats {
     users: { _id: string; count: number }[];
     cases: { _id: string; count: number }[];
     finance: { total: number }[];
+}
+
+export interface TransactionData {
+    _id: string;
+    patientName: string;
+    amount: number;
+    paymentMethod: string;
+    status: string;
+    createdAt: string;
+    date: string; 
+}
+
+export interface PatientRecord {
+    _id: string;
+    name: string;
+    paymentStatus: 'Paid' | 'Pending';
+    caseId: string;
+    assignedDoctor: string;
 }
 
 export interface CaseData {
@@ -46,31 +64,69 @@ const adminService = {
     },
 
     /**
-     * 👨‍⚕️ Create Doctor Account
+     * 💰 Fetch Detailed Transaction History
+     */
+    getTransactionHistory: async (): Promise<AdminResponse<TransactionData[]>> => {
+        try {
+            const response = await api.get('/admin/payments');
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || "Error fetching transaction history");
+        }
+    },
+
+    /**
+     * 💰 Fetch Payment/Transaction History
+     */
+    getPayments: async (): Promise<AdminResponse<any[]>> => {
+        try {
+            const response = await api.get('/admin/payments');
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || "Error fetching payments");
+        }
+    },
+
+    /**
+     * 👨‍⚕️ Fetch All Registered Doctors
+     */
+    getAllDoctors: async (): Promise<AdminResponse<any[]>> => {
+        try {
+            const response = await api.get('/admin/users?role=doctor');
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || "Error fetching doctor list");
+        }
+    },
+
+    /**
+     * 👥 Fetch All Patients with Status
+     */
+    getAllPatients: async (): Promise<AdminResponse<PatientRecord[]>> => {
+        try {
+            const response = await api.get('/admin/users?role=patient&includeStatus=true');
+            return response.data;
+        } catch (error: any) {
+            throw new Error(error.response?.data?.message || "Error fetching patient records");
+        }
+    },
+
+    /**
+     * 👨‍⚕️ Create Staff Account (Doctor or CMO)
+     * 🟢 UPDATED: Endpoint changed to match backend staff creation logic
      */
     createDoctor: async (doctorData: DoctorRegistrationData): Promise<AdminResponse> => {
         try {
-            const response = await api.post('/admin/create-doctor', doctorData);
+            // Changed from /create-doctor to /create-staff to match backend controller
+            const response = await api.post('/admin/create-staff', doctorData);
             return response.data;
         } catch (error: any) {
-            throw new Error(error.response?.data?.message || "Failed to create doctor account");
+            throw new Error(error.response?.data?.message || "Failed to create account");
         }
     },
 
     /**
-     * 👥 Fetch Users by Role
-     */
-    getUsersByRole: async (role: 'doctor' | 'patient'): Promise<AdminResponse> => {
-        try {
-            const response = await api.get(`/admin/users?role=${role}`);
-            return response.data;
-        } catch (error: any) {
-            throw new Error(error.response?.data?.message || `Error fetching ${role}s`);
-        }
-    },
-
-    /**
-     * 🔍 Fetch All Cases (with populated patient/doctor names)
+     * 🔍 Fetch All Cases
      */
     getAllCases: async (): Promise<AdminResponse<CaseData[]>> => {
         try {
@@ -82,7 +138,7 @@ const adminService = {
     },
 
     /**
-     * 🛠️ Reassign Case to a different Doctor
+     * 🛠️ Reassign Case
      */
     reassignDoctor: async (caseId: string, doctorId: string): Promise<AdminResponse> => {
         try {
@@ -94,19 +150,7 @@ const adminService = {
     },
 
     /**
-     * 💰 Fetch Payment Transactions
-     */
-    getPayments: async (): Promise<AdminResponse> => {
-        try {
-            const response = await api.get('/admin/payments');
-            return response.data;
-        } catch (error: any) {
-            throw new Error(error.response?.data?.message || "Error fetching payments");
-        }
-    },
-
-    /**
-     * ✅ Manually Verify a Payment
+     * ✅ Verify Payment
      */
     verifyPayment: async (transactionId: string): Promise<AdminResponse> => {
         try {
@@ -116,22 +160,6 @@ const adminService = {
             throw new Error(error.response?.data?.message || "Failed to verify payment");
         }
     },
-
-
-// Inside your adminService object...
-
-/**
- * 👨‍⚕️ Fetch just the doctors for the reassignment dropdown
- */
-async getAvailableDoctors(): Promise<AdminResponse<{_id: string, name: string, specialization: string}[]>> {
-    try {
-        // The 'async' keyword above allows this 'await' to work
-        const response = await api.get('/admin/users?role=doctor');
-        return response.data;
-    } catch (error: any) {
-        throw new Error(error.response?.data?.message || "Failed to fetch doctors");
-    }
-},
 };
 
 export default adminService;

@@ -25,8 +25,7 @@ export default function TabLayout() {
   const responseListener = useRef<Notifications.Subscription | null>(null);
 
   /**
-   * Register device for push notifications
-   * 🟢 FIX: Updated endpoint and added error handling to prevent 404 crash
+   * 🛡️ Push Notification Registration
    */
   const registerForPushNotificationsAsync = async () => {
     if (!Device.isDevice) return;
@@ -45,17 +44,16 @@ export default function TabLayout() {
       const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
       const token = tokenData.data;
       
-      // 🟢 PRODUCTION FIX: Match the new dedicated backend endpoint
-      // We use /auth/ because that is likely your route prefix
+      // Sync with dedicated backend endpoint
       await API.patch('/auth/update-push-token', { pushToken: token });
-      console.log("✅ Push Token Registered Successfully");
+      console.log("✅ Push Token Registered");
     } catch (error: any) {
       console.warn("Push Token Sync Error:", error.response?.data?.message || error.message);
     }
   };
 
   /**
-   * Logic to show/hide specific tabs based on user history
+   * 🔄 History Check (Role-Aware)
    */
   const checkHistoryStatus = useCallback(async (currentRole: string) => {
     if (isChecking.current) return;
@@ -67,7 +65,9 @@ export default function TabLayout() {
           const hasFinished = res.data.some((c: any) => c.status?.toUpperCase() === "COMPLETED");
           setIsPatientHistoryVisible(hasFinished);
         }
-      } else if (currentRole === 'doctor') {
+      } 
+      // 🟢 CMO and Doctor both check for completed review history
+      else if (currentRole === 'doctor' || currentRole === 'cmo') {
         const res = await doctorService.getDoctorHistory(1, 1);
         if (res.success && Array.isArray(res.data)) {
           setIsDoctorHistoryVisible(res.data.length > 0);
@@ -80,6 +80,9 @@ export default function TabLayout() {
     }
   }, []);
 
+  /**
+   * 🔔 Notification Routing Engine
+   */
   const handleNotificationAction = useCallback((data: any) => {
     const payload = data as any;
     if (!payload?.caseId) return;
@@ -94,10 +97,12 @@ export default function TabLayout() {
     }
   }, [router]);
 
+  // Sync history visibility on tab changes
   useEffect(() => {
     if (role) checkHistoryStatus(role);
   }, [pathname, role, checkHistoryStatus]);
 
+  // Setup Notification Listeners
   useEffect(() => {
     if (Platform.OS === 'android') {
       Notifications.setNotificationChannelAsync('default', {
@@ -111,12 +116,13 @@ export default function TabLayout() {
     });
 
     return () => {
-      if (responseListener.current) {
-        responseListener.current.remove();
-      }
+      if (responseListener.current) responseListener.current.remove();
     };
   }, [handleNotificationAction]);
 
+  /**
+   * 🏗️ Initialize Layout & Roles
+   */
   useEffect(() => {
     const initializeLayout = async () => {
       const savedRole = await storage.getItem('userRole');
@@ -126,6 +132,7 @@ export default function TabLayout() {
       registerForPushNotificationsAsync();
       await checkHistoryStatus(currentRole);
       
+      // Socket sync for real-time tab updates
       socketService.on('caseCompleted', () => checkHistoryStatus(currentRole));
     };
 
@@ -133,15 +140,17 @@ export default function TabLayout() {
     return () => { socketService.off('caseCompleted'); };
   }, [checkHistoryStatus]);
 
+  // 🟢 Loading State (MedTech Aesthetic)
   if (!role) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: '#002D2D' }}>
-        <ActivityIndicator color="#FFF" size="large" />
+      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+        <ActivityIndicator color={COLORS.primary} size="large" />
       </View>
     );
   }
 
-  // 🟢 FIX: Define distinct paths to prevent double-tab highlight
+  // --- TAB DEFINITIONS ---
+
   const patientTabs = [
     { name: 'Discover', icon: 'compass', path: '/(tabs)/patient/discover' },
     { name: 'Home', icon: 'home', path: '/(tabs)/patient/' as any },
@@ -149,31 +158,42 @@ export default function TabLayout() {
     { name: 'Settings', icon: 'settings', path: '/(tabs)/settings' },
   ];
 
-  const doctorTabs = [
-    { name: 'Cases', icon: 'list', path: '/(tabs)/doctor/doctor-home' },
-    ...(isDoctorHistoryVisible ? [{ name: 'Reviews', icon: 'analytics', path: '/(tabs)/doctor/doctor-history' }] : []),
+  // 🟢 Medical Tabs (Handles CMO and Doctor)
+  const medicalTabs = [
+    { 
+      name: role === 'cmo' ? 'Assignments' : 'Worklist', 
+      icon: 'list', 
+      path: '/(tabs)/doctor/doctor-home' 
+    },
+    ...(isDoctorHistoryVisible ? [{ name: 'Archive', icon: 'analytics', path: '/(tabs)/doctor/doctor-history' }] : []),
     { name: 'Settings', icon: 'settings', path: '/(tabs)/settings' },
   ];
 
   return (
     <Tabs
-      tabBar={() => <BottomNav tabs={role === 'doctor' ? doctorTabs : patientTabs} />}
+      tabBar={() => (
+        <BottomNav 
+          tabs={(role === 'doctor' || role === 'cmo') ? medicalTabs : patientTabs} 
+        />
+      )}
       screenOptions={{ headerShown: false }}
     >
-      {/* 🟢 FIX: Ensure names match the folder structure exactly. 
-        Setting href: null for index prevents it from clashing with discover.
-      */}
+      {/* Root redirection prevention */}
       <Tabs.Screen name="index" options={{ href: null }} />
+      
+      {/* Patient Folder Screens */}
       <Tabs.Screen name="patient/index" options={{ title: 'Home' }} />
       <Tabs.Screen name="patient/discover" options={{ title: 'Discover' }} />
       <Tabs.Screen name="patient/history" options={{ title: 'Vault' }} /> 
+      
+      {/* 🟢 Medical Folder Screens (Doctor & CMO) */}
+      <Tabs.Screen name="doctor/doctor-home" options={{ title: 'Worklist' }} /> 
+      <Tabs.Screen name="doctor/doctor-history" options={{ title: 'Archive' }} /> 
+      
+      {/* Common Settings */}
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
       
-      {/* Doctor Screens */}
-      <Tabs.Screen name="doctor/doctor-home" options={{ title: 'Cases' }} /> 
-      <Tabs.Screen name="doctor/doctor-history" options={{ title: 'Reviews' }} /> 
-      
-      {/* Utility Screens - Href null hides them from the BottomNav logic */}
+      {/* Utility/Stack Routes (Hidden from Tab Bar) */}
       <Tabs.Screen name="doctor-review/[caseId]" options={{ href: null }} />
       <Tabs.Screen name="patient/case-status" options={{ href: null }} />
       <Tabs.Screen name="patient/case-summary" options={{ href: null }} />

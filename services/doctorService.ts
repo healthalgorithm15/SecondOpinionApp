@@ -1,4 +1,5 @@
 import API from '../utils/api';
+import { storage } from '@/utils/storage';
 
 /**
  * doctorService
@@ -6,22 +7,25 @@ import API from '../utils/api';
  */
 export const doctorService = {
   /**
-   * 🟢 Fetch all cases awaiting specialist review
-   * Hits: GET /api/doctor/pending-cases
+   * 🟢 Fetch cases awaiting action
+   * CMOs get the global queue via '?view=all', Specialists get their assigned queue.
    */
   getPendingCases: async () => {
     try {
-      const response = await API.get('/doctor/pending-cases');
+      const role = await storage.getItem('userRole');
+      const isCmo = role?.toLowerCase() === 'cmo';
+      
+      const endpoint = isCmo ? '/doctor/pending-cases?view=all' : '/doctor/pending-cases';
+      const response = await API.get(endpoint);
       return response.data;
     } catch (error: any) {
       console.error("❌ Get Pending Cases Error:", error.response?.data || error.message);
-      throw error; // Throwing allows component-level catch blocks to handle UI alerts
+      throw error;
     }
   },
 
   /**
-   * 🟢 Fetch specific case details for the review screen
-   * Hits: GET /api/doctor/case/:caseId
+   * 🟢 Fetch specific case details
    */
   getCaseDetails: async (caseId: string) => {
     try {
@@ -34,9 +38,8 @@ export const doctorService = {
   },
 
   /**
-   * 🟢 Submit the final doctor analysis
-   * Matches the backend transaction logic and accepts flexible naming
-   * Hits: POST /api/doctor/submit-opinion
+   * 🟢 Specialist: Submit analysis
+   * Moves case from 'ASSIGNED' to 'PENDING_CMO_APPROVAL'
    */
   submitAnalysis: async (
     caseId: string, 
@@ -55,15 +58,51 @@ export const doctorService = {
   },
 
   /**
-   * 🟢 NEW: Fetch completed reviews (History) with pagination
-   * Hits: GET /api/doctor/history?page=1&limit=10
+   * 👑 CMO: Final Approval & Publish
+   * Publishes the report so the patient can finally see it.
+   */
+  cmoApproveCase: async (
+    caseId: string, 
+    approvalData: { updatedVerdict: string; updatedRecommendations: string; cmoPrivateNote?: string }
+  ) => {
+    try {
+      const response = await API.post(`/doctor/cmo-approve`, {
+        caseId,
+        ...approvalData
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ CMO Approval Error:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 👑 CMO: Assign Case to Specialist
+   * Hits the endpoint to move case from 'UNASSIGNED' to 'ASSIGNED'
+   */
+  assignSpecialist: async (caseId: string, specialistId: string) => {
+    try {
+      const response = await API.post('/doctor/assign-case', {
+        caseId,
+        specialistId
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Assignment Error:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 🟢 Fetch completed reviews (History)
    */
   getDoctorHistory: async (page = 1, limit = 10) => {
     try {
       const response = await API.get('/doctor/history', {
         params: { page, limit }
       });
-      return response.data; // Returns { success: true, data: [...], pagination: {...} }
+      return response.data;
     } catch (error: any) {
       console.error("❌ Get Doctor History Error:", error.response?.data || error.message);
       throw error;

@@ -13,12 +13,32 @@ import { COLORS, SHADOWS } from '../../../constants/theme';
 
 // --- LOGIC ---
 import { doctorService } from '../../../services/doctorService';
+import { storage } from '@/utils/storage';
 
 export default function DoctorHomeScreen() {
   const router = useRouter();
+  
+  // --- UI & DATA STATE ---
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [cases, setCases] = useState<any[]>([]);
+  
+  // --- IDENTITY STATE ---
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string>('');
+
+  /**
+   * 🆔 Load User Identity
+   */
+  useEffect(() => {
+    const loadIdentity = async () => {
+      const role = await storage.getItem('userRole');
+      const name = await storage.getItem('userName');
+      setUserRole(role);
+      setUserName(name || '');
+    };
+    loadIdentity();
+  }, []);
 
   /**
    * 🔄 Fetch Live Worklist
@@ -49,12 +69,7 @@ export default function DoctorHomeScreen() {
   const handleViewFile = (record: any, patientName: string) => {
     const isObject = typeof record === 'object' && record !== null;
     const recordId = isObject ? record._id : record;
-    
-    // Improved detection logic
     let contentType = isObject ? record.contentType : 'application/pdf';
-    
-    // If we only have an ID string, we can't be 100% sure of the type, 
-    // but DocumentViewScreen's new isPDF check will help.
     
     if (!recordId) {
       Alert.alert("Error", "Medical record ID is missing.");
@@ -65,9 +80,9 @@ export default function DoctorHomeScreen() {
       pathname: '/view/DocumentViewScreen', 
       params: { 
         docId: recordId, 
-        fileName: `${patientName}'s Record` || 'Medical Record',
+        fileName: `${patientName}'s Record`,
         contentType: contentType,
-        role: 'doctor' 
+        role: userRole || 'doctor' 
       }
     } as any);
   };
@@ -102,7 +117,6 @@ export default function DoctorHomeScreen() {
           <View style={styles.actionSection}>
             <View style={styles.attachmentGrid}>
               {item.recordIds?.map((record: any, index: number) => {
-                // Determine icon based on contentType
                 const isPdf = (typeof record === 'object' ? record.contentType : '').includes('pdf');
                 
                 return (
@@ -127,7 +141,7 @@ export default function DoctorHomeScreen() {
             <TouchableOpacity 
               style={[styles.reviewBtn, { backgroundColor: accentColor }]} 
               onPress={() => router.push({
-                pathname: '/(tabs)/doctor-review/[caseId]',
+                pathname: '/(tabs)/doctor/doctor-review/[caseId]',
                 params: { caseId: item._id }
               } as any)}
             >
@@ -144,10 +158,16 @@ export default function DoctorHomeScreen() {
     <View style={styles.screenWrapper}>
       <AuthLayout>
         <View style={styles.mainContainer}>
+          {/* 🟢 DYNAMIC HEADER BASED ON ROLE */}
           <View style={styles.headerInfo}>
-            <Text style={styles.welcome}>Worklist</Text>
+            <Text style={styles.welcomeGreeting}>
+              {userRole === 'cmo' ? 'Chief Medical Officer' : 'Medical Specialist'}
+            </Text>
+            <Text style={styles.welcomeName}>
+               {userRole === 'cmo' ? userName : `Dr. ${userName}`}
+            </Text>
             <Text style={styles.subtitle}>
-              {loading ? 'Updating...' : `${cases.length} pending assignments`}
+              {loading ? 'Updating Worklist...' : `${cases.length} pending assignments`}
             </Text>
           </View>
 
@@ -156,6 +176,7 @@ export default function DoctorHomeScreen() {
             renderItem={renderCaseItem}
             keyExtractor={(item) => item._id}
             contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               !loading ? (
                 <View style={styles.emptyContainer}>
@@ -181,9 +202,10 @@ export default function DoctorHomeScreen() {
 const styles = StyleSheet.create({
   screenWrapper: { flex: 1, backgroundColor: '#F8FAFC' },
   mainContainer: { flex: 1, width: '100%' },
-  headerInfo: { alignItems: 'center', marginBottom: 20 },
-  welcome: { fontSize: 24, fontWeight: '800', color: '#1E293B' },
-  subtitle: { fontSize: 14, color: '#64748B' },
+  headerInfo: { alignItems: 'center', marginBottom: 24, paddingHorizontal: 20 },
+  welcomeGreeting: { fontSize: 13, fontWeight: '700', color: COLORS.primary, textTransform: 'uppercase', letterSpacing: 1 },
+  welcomeName: { fontSize: 26, fontWeight: '800', color: '#1E293B', marginTop: 4 },
+  subtitle: { fontSize: 14, color: '#64748B', marginTop: 4 },
   listContainer: { paddingHorizontal: 16, paddingBottom: 100 },
 
   caseCard: { 
@@ -196,26 +218,26 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
     ...SHADOWS.soft
   },
-  urgencyStrip: { width: 5 },
+  urgencyStrip: { width: 6 },
   cardBody: { 
     flex: 1, 
     flexDirection: 'row', 
-    padding: 12, 
+    padding: 14, 
     alignItems: 'center', 
     justifyContent: 'space-between' 
   },
 
-  infoSection: { flex: 0.55 }, // Limits text area width to prevent overlap
+  infoSection: { flex: 0.55 },
   caseId: { fontSize: 10, fontWeight: '800', color: '#94A3B8', letterSpacing: 1 },
-  patientName: { fontSize: 16, fontWeight: '700', color: '#1E293B', marginVertical: 2 },
+  patientName: { fontSize: 17, fontWeight: '700', color: '#1E293B', marginVertical: 2 },
   typeBadge: { 
     alignSelf: 'flex-start',
     paddingHorizontal: 6, paddingVertical: 2, 
     borderRadius: 4, borderWidth: 1, marginTop: 4 
   },
-  typeText: { fontSize: 8, fontWeight: '900' },
+  typeText: { fontSize: 9, fontWeight: '900' },
 
-  actionSection: { flex: 0.45, alignItems: 'flex-end' }, // Groups icons and button on the right
+  actionSection: { flex: 0.45, alignItems: 'flex-end' },
   attachmentGrid: { 
     flexDirection: 'row', 
     flexWrap: 'wrap', 
@@ -251,9 +273,9 @@ const styles = StyleSheet.create({
   reviewBtn: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    paddingHorizontal: 12, 
-    paddingVertical: 8, 
-    borderRadius: 8 
+    paddingHorizontal: 14, 
+    paddingVertical: 9, 
+    borderRadius: 10 
   },
   reviewBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13, marginRight: 4 },
 

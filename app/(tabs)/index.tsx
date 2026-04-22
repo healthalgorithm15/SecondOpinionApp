@@ -1,13 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { storage } from '../../utils/storage';
 import { COLORS } from '../../constants/theme';
 
 export default function HomeScreen() {
   const router = useRouter();
 
-  useEffect(() => {
+  useFocusEffect(
+    useCallback(() => {
+
     const checkUserAndRedirect = async () => {
       try {
         const token = await storage.getItem('userToken');
@@ -21,7 +23,7 @@ export default function HomeScreen() {
             if (role === 'doctor') {
               router.replace('/(tabs)/doctor/doctor-home');
             } else if (role === 'admin') {
-              router.replace('/(tabs)/admin-home');
+              router.replace('/(admin)/index' as any);
             } else {
               router.replace('/(tabs)/patient' as any);
             }
@@ -37,7 +39,7 @@ export default function HomeScreen() {
     };
 
     checkUserAndRedirect();
-  }, []);
+  }, []));
 
   return (
     <View style={styles.container}>

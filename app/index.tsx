@@ -38,9 +38,10 @@ useEffect(() => {
       const role = rawRole ? rawRole.toLowerCase() : null;
 
       // If we have a token and a role, send them to their dashboard
+      console.log("token * role", token, "+" , role)
       if (token && role) {
         if (role === 'admin') {
-          router.replace('/(tabs)/admin-home');
+          router.replace('/(admin)/' as any);
         } else if (role === 'doctor') {
           // Note: We send doctors to home. If they need activation, 
           // your existing login/otp flow handles that specifically.

@@ -10,7 +10,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.healthalgorithm.secondmedapp",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.healthalgorithm.secondmedapp",
@@ -21,7 +24,10 @@
         "INTERNET",
         "CAMERA",
         "READ_MEDIA_IMAGES",
-        "READ_MEDIA_VIDEO"
+        "READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -45,7 +51,7 @@
         }
       ],
       "expo-file-system",
-       "expo-dev-client",
+      "expo-dev-client",
       [
         "expo-splash-screen",
         {
