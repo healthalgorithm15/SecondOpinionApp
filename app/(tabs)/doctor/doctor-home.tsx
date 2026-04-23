@@ -93,6 +93,9 @@ export default function DoctorHomeScreen() {
   const renderCaseItem = ({ item }: { item: any }) => {
     const isUrgent = item.aiAnalysis?.riskLevel === 'High';
     const accentColor = isUrgent ? '#EF4444' : '#1E7D75';
+    
+    // Check if this case needs assignment (CMO view only)
+    const needsAssignment = userRole === 'cmo' && !item.specialistId;
 
     return (
       <View style={styles.caseCard}>
@@ -113,11 +116,11 @@ export default function DoctorHomeScreen() {
             </View>
           </View>
 
-          {/* RIGHT SECTION: Multi-Attachments & Review Button */}
+          {/* RIGHT SECTION: Multi-Attachments & Action Button */}
           <View style={styles.actionSection}>
             <View style={styles.attachmentGrid}>
               {item.recordIds?.map((record: any, index: number) => {
-                const isPdf = (typeof record === 'object' ? record.contentType : '').includes('pdf');
+                const isPdf = (record?.contentType || '').includes('pdf');
                 
                 return (
                   <TouchableOpacity 
@@ -139,14 +142,35 @@ export default function DoctorHomeScreen() {
             </View>
 
             <TouchableOpacity 
-              style={[styles.reviewBtn, { backgroundColor: accentColor }]} 
-              onPress={() => router.push({
-                pathname: '/(tabs)/doctor/doctor-review/[caseId]',
-                params: { caseId: item._id }
-              } as any)}
+              style={[
+                styles.reviewBtn, 
+                { backgroundColor: needsAssignment ? '#4F46E5' : accentColor }
+              ]} 
+              onPress={() => {
+                if (needsAssignment) {
+                  router.push({
+                    pathname: '/(tabs)/doctor/assign-specialist/[caseId]',
+                    params: { caseId: item._id }
+                  } as any);
+                } else {
+                  router.push({
+                    pathname: '/(tabs)/doctor/doctor-review/[caseId]',
+                    params: { 
+                      caseId: item._id,
+                      mode: userRole === 'cmo' ? 'approve' : 'review' 
+                    }
+                  } as any);
+                }
+              }}
             >
-              <Text style={styles.reviewBtnText}>Review</Text>
-              <Ionicons name="chevron-forward" size={14} color="#FFF" />
+              <Text style={styles.reviewBtnText}>
+                {needsAssignment ? 'Assign' : 'Review'}
+              </Text>
+              <Ionicons 
+                name={needsAssignment ? "person-add" : "chevron-forward"} 
+                size={14} 
+                color="#FFF" 
+              />
             </TouchableOpacity>
           </View>
         </View>

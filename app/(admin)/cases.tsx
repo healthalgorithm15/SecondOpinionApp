@@ -50,7 +50,7 @@ export default function CaseAuditScreen() {
     setModalVisible(true);
     setModalLoading(true);
     try {
-      const res = await adminService.getAvailableDoctors();
+      const res = await adminService.getAllDoctors();
       if (res.success && res.data) {
         setDoctors(res.data);
       }

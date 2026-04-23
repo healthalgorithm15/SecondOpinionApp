@@ -33,13 +33,30 @@ export default function DoctorsListScreen() {
       <FlatList
         data={doctors}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => (
-          <View style={styles.docCard}>
-            <Text style={styles.docName}>Dr. {item.name}</Text>
-            <Text style={styles.docSpec}>{item.specialization}</Text>
-            <Text style={styles.docMci}>MCI: {item.mciNumber}</Text>
-          </View>
-        )}
+      renderItem={({ item }) => {
+  const isCmo = item.role?.toLowerCase() === 'cmo';
+  
+  return (
+    <View style={[styles.docCard, { borderLeftColor: isCmo ? '#4F46E5' : '#1E4D48' }]}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={styles.docName}>Dr. {item.name}</Text>
+        
+        {/* ROLE BADGE */}
+        <View style={[
+          styles.badge, 
+          { backgroundColor: isCmo ? '#EEF2FF' : '#F0FDFA' }
+        ]}>
+          <Text style={[styles.badgeText, { color: isCmo ? '#4F46E5' : '#1E4D48' }]}>
+            {isCmo ? 'CMO' : 'Specialist'}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={styles.docSpec}>{item.specialization || 'Hospital Leadership'}</Text>
+      <Text style={styles.docMci}>MCI: {item.mciNumber || 'N/A'}</Text>
+    </View>
+  );
+}}
         contentContainerStyle={{ paddingBottom: 40 }}
       />
     </View>
@@ -58,6 +75,15 @@ const styles = StyleSheet.create({
     borderLeftColor: '#1E4D48',
     elevation: 2 
   },
+  badge: {
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 6,
+},
+badgeText: {
+  fontSize: 10,
+  fontWeight: '800',
+},
   docName: { fontSize: 17, fontWeight: 'bold', color: '#1E293B' },
   docSpec: { color: '#64748B', marginTop: 2 },
   docMci: { fontSize: 12, color: '#94A3B8', marginTop: 4 }
