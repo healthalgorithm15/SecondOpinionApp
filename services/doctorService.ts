@@ -15,6 +15,7 @@ export const doctorService = {
       const role = await storage.getItem('userRole');
       const isCmo = role?.toLowerCase() === 'cmo';
       
+      // CMO sees all unassigned/pending cases; Specialists see only their own.
       const endpoint = isCmo ? '/doctor/pending-cases?view=all' : '/doctor/pending-cases';
       const response = await API.get(endpoint);
       return response.data;
@@ -48,7 +49,9 @@ export const doctorService = {
     try {
       const response = await API.post('/doctor/submit-opinion', {
         caseId,
-        ...analysisData
+        // Map frontend keys to backend keys
+        finalVerdict: analysisData.diagnosis, 
+        recommendations: analysisData.summary
       });
       return response.data;
     } catch (error: any) {
@@ -68,7 +71,11 @@ export const doctorService = {
     try {
       const response = await API.post(`/doctor/cmo-approve`, {
         caseId,
-        ...approvalData
+        // Ensure keys match what the CMO flow expects in your backend
+        updatedVerdict: approvalData.updatedVerdict,
+        updatedRecommendations: approvalData.updatedRecommendations,
+        cmoPrivateNote: approvalData.cmoPrivateNote || "Approved via Mobile",
+        publishedAt: new Date().toISOString() // Track when the CMO finalized it
       });
       return response.data;
     } catch (error: any) {
@@ -78,18 +85,31 @@ export const doctorService = {
   },
 
   /**
-   * 👑 CMO: Assign Case to Specialist
-   * Hits the endpoint to move case from 'UNASSIGNED' to 'ASSIGNED'
+   * 🤝 CMO: Assign a specialist to a case
    */
   assignSpecialist: async (caseId: string, specialistId: string) => {
     try {
       const response = await API.post('/doctor/assign-case', {
         caseId,
-        specialistId
+        doctorId: specialistId,
+        note: "Urgent review requested"
       });
       return response.data;
     } catch (error: any) {
       console.error("❌ Assignment Error:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+  /**
+   * 👥 CMO: Fetch list of all available specialists
+   */
+  getAllSpecialists: async () => {
+    try {
+      const response = await API.get('/doctor/specialists');
+      return response.data;
+    } catch (error: any) {
+      console.error("❌ Get Specialists Error:", error.response?.data || error.message);
       throw error;
     }
   },

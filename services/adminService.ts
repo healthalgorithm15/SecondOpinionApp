@@ -118,7 +118,7 @@ const adminService = {
     createDoctor: async (doctorData: DoctorRegistrationData): Promise<AdminResponse> => {
         try {
             // Changed from /create-doctor to /create-staff to match backend controller
-            const response = await api.post('/admin/create-staff', doctorData);
+            const response = await api.post('/admin/create-doctor', doctorData);
             return response.data;
         } catch (error: any) {
             throw new Error(error.response?.data?.message || "Failed to create account");
